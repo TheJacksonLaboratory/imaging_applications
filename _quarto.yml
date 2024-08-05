@@ -1,0 +1,33 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "JAX RIT Imaging Applications"
+  site-url: https://thejacksonlaboratory.github.io/imaging_applications
+  description: "JAX RIT Imaging Applications"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: https://erickmartins.github.io
+        text: Erick
+      - href: fernando.qmd
+        text: Fernando
+      - href: kiya.qmd
+        text: Kiya
+      - href: peter.qmd
+        text: Peter
+      - posts.qmd
+    right:
+      - icon: rss
+        href: posts.xml
+
+
+format:
+  html:
+    theme:
+      light: cosmo
+      dark: cyborg
+    css: styles.css
+    toc: true
