@@ -9,16 +9,9 @@
   {
     "objectID": "index.html",
     "href": "index.html",
-    "title": "imaging_applications",
+    "title": "JAX Research IT, Imaging Applications team",
     "section": "",
-    "text": "This is a Quarto website.\nTo learn more about Quarto websites visit https://quarto.org/docs/websites."
-  },
-  {
-    "objectID": "about.html",
-    "href": "about.html",
-    "title": "About",
-    "section": "",
-    "text": "About this site"
+    "text": "(imagine a really nice photo of the whole team here)\nWe are a team of four technical experts inside the Research IT department at The Jackson Laboratory providing support to researchers on all their imaging data needs. Some of our offerings include:\n\nTraining\nWe run about a dozen workshops per year on a variety of imaging-related topics, covering both specific tools and general skills, from beginner level to advanced topics. In 2024, these included, for example:\n\npopular tools such as Fiji, QuPath and CellProfiler;\nimaging data management with OMERO;\nImage processing with Python, from basic skills to advanced machine learning methods;\nHow to follow coding best practices in Python.\n\n\n\nConsultation\nOur team is routinely in touch with Principal Investigators and their teams, assisting on image analysis projects in steps such as tool selection, pipelining, applying existing pipelines in our computational environments and so on.\n\n\nData management applications\nWe run two instances of OMERO, an open-source microscopy data management platform; one internal to JAX, for day-to-day research usage, and one cloud-based, as a public data repository. JAX researchers can move data between the two instances to publish a dataset with minimal hassle.\n\n\nExpert advice\nOur team takes pride in being current with the state-of-the-art on anything bioimaging, multiplying that knowledge back into the JAX community. Our researchers are rarely bioimage analysis experts, and they don’t need to be; that’s our job!\n\n\nTool development\nWe are deeply involved in the wider open-source imaging community; our team includes core developers in a wide array of tools such as ezomero, napari, ZarrDataset and omero-cli-transfer."
   },
   {
     "objectID": "posts/2024-08-05-post-template/index.html",

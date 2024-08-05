@@ -1,7 +1,34 @@
 ---
-title: "imaging_applications"
+title: "JAX Research IT, Imaging Applications team"
+about:
+    template: solana
+    image: posts/2024-08-05-post-template/JAX_logo_rgb_transparentback.png
 ---
 
-This is a Quarto website.
+(imagine a really nice photo of the whole team here)
 
-To learn more about Quarto websites visit <https://quarto.org/docs/websites>.
+We are a team of four technical experts inside the Research IT department at [The Jackson Laboratory](https://jax.org) providing support to researchers on all their imaging data needs. Some of our offerings include:
+
+### Training
+We run about a dozen workshops per year on a variety of imaging-related topics, covering both specific tools and general skills, from beginner level to advanced topics. In 2024, these included, for example:
+
+- popular tools such as Fiji, QuPath and CellProfiler;
+- imaging data management with OMERO;
+- Image processing with Python, from basic skills to advanced machine learning methods;
+- How to follow coding best practices in Python.
+
+### Consultation
+
+Our team is routinely in touch with Principal Investigators and their teams, assisting on image analysis projects in steps such as tool selection, pipelining, applying existing pipelines in our computational environments and so on.
+
+### Data management applications
+
+We run two instances of OMERO, an open-source microscopy data management platform; one internal to JAX, for day-to-day research usage, and one cloud-based, as a public data repository. JAX researchers can move data between the two instances to publish a dataset with minimal hassle.
+
+### Expert advice
+
+Our team takes pride in being current with the state-of-the-art on anything bioimaging, multiplying that knowledge back into the JAX community. Our researchers are rarely bioimage analysis experts, and they don't need to be; that's our job!
+
+### Tool development
+
+We are deeply involved in the wider open-source imaging community; our team includes core developers in a wide array of tools such as [ezomero](https://github.com/TheJacksonLaboratory/ezomero), [napari](https://napari.org), [ZarrDataset](https://github.com/TheJacksonLaboratory/zarrdataset) and [omero-cli-transfer](https://github.com/ome/omero-cli-transfer).
