@@ -1,6 +1,8 @@
 [
   {
     "listing": "/posts.html",
-    "items": []
+    "items": [
+      "/posts/2024-08-05-post-template/index.html"
+    ]
   }
 ]

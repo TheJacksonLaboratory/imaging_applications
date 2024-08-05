@@ -2,26 +2,30 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://thejacksonlaboratory.github.io/imaging_applications/posts.html</loc>
-    <lastmod>2024-08-05T14:16:43.569Z</lastmod>
+    <lastmod>2024-08-05T14:48:43.057Z</lastmod>
   </url>
   <url>
-    <loc>https://thejacksonlaboratory.github.io/imaging_applications/kiya.html</loc>
-    <lastmod>2024-08-05T14:17:47.276Z</lastmod>
-  </url>
-  <url>
-    <loc>https://thejacksonlaboratory.github.io/imaging_applications/fernando.html</loc>
-    <lastmod>2024-08-05T14:17:43.138Z</lastmod>
-  </url>
-  <url>
-    <loc>https://thejacksonlaboratory.github.io/imaging_applications/about.html</loc>
-    <lastmod>2024-08-05T14:11:28.524Z</lastmod>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/peter.html</loc>
+    <lastmod>2024-08-05T14:17:51.855Z</lastmod>
   </url>
   <url>
     <loc>https://thejacksonlaboratory.github.io/imaging_applications/index.html</loc>
     <lastmod>2024-08-05T14:11:28.524Z</lastmod>
   </url>
   <url>
-    <loc>https://thejacksonlaboratory.github.io/imaging_applications/peter.html</loc>
-    <lastmod>2024-08-05T14:17:51.855Z</lastmod>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/about.html</loc>
+    <lastmod>2024-08-05T14:11:28.524Z</lastmod>
+  </url>
+  <url>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/fernando.html</loc>
+    <lastmod>2024-08-05T14:17:43.138Z</lastmod>
+  </url>
+  <url>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/kiya.html</loc>
+    <lastmod>2024-08-05T14:17:47.276Z</lastmod>
+  </url>
+  <url>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-05-post-template/index.html</loc>
+    <lastmod>2024-08-05T14:45:47.760Z</lastmod>
   </url>
 </urlset>

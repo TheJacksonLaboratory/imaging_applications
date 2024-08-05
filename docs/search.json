@@ -4,7 +4,14 @@
     "href": "posts.html",
     "title": "Blog",
     "section": "",
-    "text": "No matching items"
+    "text": "Blog post template\n\n\n\n\n\n\ntemplate\n\n\n\nThis is a description for your blogpost\n\n\n\n\n\nAug 5, 2024\n\n\nErick Ratamero\n\n\n\n\n\n\nNo matching items"
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "imaging_applications",
+    "section": "",
+    "text": "This is a Quarto website.\nTo learn more about Quarto websites visit https://quarto.org/docs/websites."
   },
   {
     "objectID": "about.html",
@@ -14,10 +21,17 @@
     "text": "About this site"
   },
   {
-    "objectID": "index.html",
-    "href": "index.html",
-    "title": "imaging_applications",
+    "objectID": "posts/2024-08-05-post-template/index.html",
+    "href": "posts/2024-08-05-post-template/index.html",
+    "title": "Blog post template",
     "section": "",
-    "text": "This is a Quarto website.\nTo learn more about Quarto websites visit https://quarto.org/docs/websites."
+    "text": "You can write in sections.\n\n\nMore writing!\n\n\n\nYou can add an image: \nor a link to a webpage.\nYou can also do much, much more (explore the quarto tutorials for how to add plots and data and stuff)."
+  },
+  {
+    "objectID": "posts/2024-08-05-post-template/index.html#section-1",
+    "href": "posts/2024-08-05-post-template/index.html#section-1",
+    "title": "Blog post template",
+    "section": "",
+    "text": "You can write in sections.\n\n\nMore writing!\n\n\n\nYou can add an image: \nor a link to a webpage.\nYou can also do much, much more (explore the quarto tutorials for how to add plots and data and stuff)."
   }
 ]

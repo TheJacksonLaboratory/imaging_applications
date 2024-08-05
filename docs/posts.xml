@@ -10,6 +10,42 @@
 <atom:link href="https://thejacksonlaboratory.github.io/imaging_applications/posts.xml" rel="self" type="application/rss+xml"/>
 <description>JAX RIT Imaging Applications</description>
 <generator>quarto-1.5.54</generator>
-<lastBuildDate>Mon, 05 Aug 2024 14:19:54 GMT</lastBuildDate>
+<lastBuildDate>Mon, 05 Aug 2024 04:00:00 GMT</lastBuildDate>
+<item>
+  <title>Blog post template</title>
+  <dc:creator>Erick Ratamero</dc:creator>
+  <link>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-05-post-template/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="blog-post-title" class="level1">
+<h1>Blog post title</h1>
+<section id="section-1" class="level2">
+<h2 class="anchored" data-anchor-id="section-1">Section 1</h2>
+<p>You can write in sections.</p>
+<section id="subsection-1" class="level3">
+<h3 class="anchored" data-anchor-id="subsection-1">Subsection 1</h3>
+<p>More writing!</p>
+</section>
+<section id="subsection-2" class="level3">
+<h3 class="anchored" data-anchor-id="subsection-2">Subsection 2</h3>
+<p>You can add an image: <img src="https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-05-post-template/JAX_logo_rgb_transparentback.png" class="img-fluid"></p>
+<p>or a <a href="https://jax.org">link to a webpage</a>.</p>
+<p>You can also do much, much more (explore the quarto tutorials for how to add plots and data and stuff).</p>
+
+
+</section>
+</section>
+</section>
+
+ ]]></description>
+  <category>template</category>
+  <guid>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-05-post-template/</guid>
+  <pubDate>Mon, 05 Aug 2024 04:00:00 GMT</pubDate>
+  <media:content url="https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-05-post-template/JAX_logo_rgb_transparentback.png" medium="image" type="image/png" height="65" width="144"/>
+</item>
 </channel>
 </rss>
