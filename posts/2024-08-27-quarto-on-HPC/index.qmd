@@ -28,7 +28,8 @@ And in contrast with jupyter notebooks, it offers a wide variety of ways to shar
 # Install Quarto on a remote server (HPC)
 
 In this post, two options are presented to install Quarto on a HPC server.
-The first option installs Quarto on your home directory and works fine when creating code-less documents.
+The first option installs Quarto in your home directory and works fine when creating code-less documents.
+
 The second option is a way to have Quarto installed in a virtual environment, which is useful for creating jupyter-like notebooks with executable code.
 
 ## Option 1. Install Quarto on your home directory
