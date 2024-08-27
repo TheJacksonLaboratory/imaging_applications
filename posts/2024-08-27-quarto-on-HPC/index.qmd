@@ -34,7 +34,8 @@ The second option is a way to have Quarto installed in a virtual environment, wh
 
 ## Option 1. Install Quarto on your home directory
 
-Download the Quarto source code for *Linux x86 Tarball* from their [official website](https://quarto.org/docs/download/tarball.html?version=1.5.56&idPrefix=download) into your home directory.
+Download the Quarto source code for *Linux x86 Tarball* from their [official website](https://quarto.org/docs/download/tarball.html) into your home directory.
+
 You can download the source code by copying the address link of the download, and using `wget` to download it directly into your home directory.
 
 ::: {.callout-tip}
