@@ -6,8 +6,11 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
+<meta name="author" content="Fernando Cervantes">
+<meta name="dcterms.date" content="2024-08-27">
+<meta name="description" content="A tutorial for setting up Quarto in a remote server (HPC)">
 
-<title>JAX Research IT, Imaging Applications team – JAX RIT Imaging Applications</title>
+<title>Quarto on HPC – JAX RIT Imaging Applications</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -23,23 +26,24 @@ ul.task-list li input[type="checkbox"] {
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
-<script src="site_libs/quarto-nav/headroom.min.js"></script>
-<script src="site_libs/clipboard/clipboard.min.js"></script>
-<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
-<script src="site_libs/quarto-search/fuse.min.js"></script>
-<script src="site_libs/quarto-search/quarto-search.js"></script>
-<meta name="quarto:offset" content="./">
-<script src="site_libs/quarto-html/quarto.js"></script>
-<script src="site_libs/quarto-html/popper.min.js"></script>
-<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
-<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
-<script src="site_libs/bootstrap/bootstrap.min.js"></script>
-<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
-<link href="site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
 <script id="quarto-search-options" type="application/json">{
   "location": "navbar",
   "copy-button": false,
@@ -69,17 +73,17 @@ ul.task-list li input[type="checkbox"] {
 }</script>
 
 
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="../../styles.css">
 </head>
 
 <body class="nav-fixed">
 
 <div id="quarto-search-results"></div>
-  <header id="quarto-header" class="headroom fixed-top">
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
     <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
       <div class="navbar-container container-fluid">
       <div class="navbar-brand-container mx-auto">
-    <a class="navbar-brand" href="./index.html">
+    <a class="navbar-brand" href="../../index.html">
     <span class="navbar-title">JAX RIT Imaging Applications</span>
     </a>
   </div>
@@ -90,11 +94,11 @@ ul.task-list li input[type="checkbox"] {
           <div class="collapse navbar-collapse" id="navbarCollapse">
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
-    <a class="nav-link active" href="./index.html" aria-current="page"> 
+    <a class="nav-link" href="../../index.html"> 
 <span class="menu-text">Home</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./about.html"> 
+    <a class="nav-link" href="../../about.html"> 
 <span class="menu-text">The Team</span></a>
   </li>  
   <li class="nav-item">
@@ -102,25 +106,25 @@ ul.task-list li input[type="checkbox"] {
 <span class="menu-text">Erick</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./fernando.html"> 
+    <a class="nav-link" href="../../fernando.html"> 
 <span class="menu-text">Fernando</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./kiya.html"> 
+    <a class="nav-link" href="../../kiya.html"> 
 <span class="menu-text">Kiya</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./peter.html"> 
+    <a class="nav-link" href="../../peter.html"> 
 <span class="menu-text">Peter</span></a>
   </li>  
   <li class="nav-item">
-    <a class="nav-link" href="./posts.html"> 
+    <a class="nav-link" href="../../posts.html"> 
 <span class="menu-text">Blog</span></a>
   </li>  
 </ul>
             <ul class="navbar-nav navbar-nav-scroll ms-auto">
   <li class="nav-item compact">
-    <a class="nav-link" href="./posts.xml"> <i class="bi bi-rss" role="img">
+    <a class="nav-link" href="../../posts.xml"> <i class="bi bi-rss" role="img">
 </i> 
 <span class="menu-text"></span></a>
   </li>  
@@ -133,71 +137,300 @@ ul.task-list li input[type="checkbox"] {
     </nav>
 </header>
 <!-- content -->
-<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Quarto on HPC</h1>
+                  <div>
+        <div class="description">
+          A tutorial for setting up Quarto in a remote server (HPC)
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">HPC</div>
+                <div class="quarto-category">Tutorials</div>
+              </div>
+                  </div>
+  </div>
+    
+  <div class="quarto-title-meta-author">
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Affiliation</div>
+    
+      <div class="quarto-title-meta-contents">
+      <p class="author"><a href="https://www.github.com/fercer">Fernando Cervantes</a> <a href="https://orcid.org/0000-0003-0652-2750" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              <a href="https://jax.org/">
+              The Jackson Laboratory
+              </a>
+            </p>
+        </div>
+    </div>
+
+  <div class="quarto-title-meta">
+
+        
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">August 27, 2024</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active">
     <h2 id="toc-title">On this page</h2>
+   
   <ul>
-  <li><a href="#training" id="toc-training" class="nav-link active" data-scroll-target="#training">Training</a></li>
-  <li><a href="#consultation" id="toc-consultation" class="nav-link" data-scroll-target="#consultation">Consultation</a></li>
-  <li><a href="#data-management-applications" id="toc-data-management-applications" class="nav-link" data-scroll-target="#data-management-applications">Data management applications</a></li>
-  <li><a href="#expert-advice" id="toc-expert-advice" class="nav-link" data-scroll-target="#expert-advice">Expert advice</a></li>
-  <li><a href="#tool-development" id="toc-tool-development" class="nav-link" data-scroll-target="#tool-development">Tool development</a></li>
+  <li><a href="#what-is-quarto" id="toc-what-is-quarto" class="nav-link active" data-scroll-target="#what-is-quarto">What is Quarto?</a></li>
+  <li><a href="#install-quarto-on-a-remote-server-hpc" id="toc-install-quarto-on-a-remote-server-hpc" class="nav-link" data-scroll-target="#install-quarto-on-a-remote-server-hpc">Install Quarto on a remote server (HPC)</a>
+  <ul class="collapse">
+  <li><a href="#option-1.-install-quarto-on-your-home-directory" id="toc-option-1.-install-quarto-on-your-home-directory" class="nav-link" data-scroll-target="#option-1.-install-quarto-on-your-home-directory">Option 1. Install Quarto on your home directory</a></li>
+  <li><a href="#option-2.-install-quarto-in-a-conda-virtual-environment" id="toc-option-2.-install-quarto-in-a-conda-virtual-environment" class="nav-link" data-scroll-target="#option-2.-install-quarto-in-a-conda-virtual-environment">Option 2. Install Quarto in a <code>conda</code> virtual environment</a></li>
+  </ul></li>
+  <li><a href="#render-and-preview-documents" id="toc-render-and-preview-documents" class="nav-link" data-scroll-target="#render-and-preview-documents">Render and preview documents</a></li>
+  <li><a href="#authoring-jupyter-notebooks-with-quarto" id="toc-authoring-jupyter-notebooks-with-quarto" class="nav-link" data-scroll-target="#authoring-jupyter-notebooks-with-quarto">Authoring Jupyter notebooks with Quarto</a></li>
+  <li><a href="#integration-with-vscode" id="toc-integration-with-vscode" class="nav-link" data-scroll-target="#integration-with-vscode">Integration with VSCode</a>
+  <ul class="collapse">
+  <li><a href="#install-the-quarto-extension" id="toc-install-the-quarto-extension" class="nav-link" data-scroll-target="#install-the-quarto-extension">Install the Quarto extension</a></li>
+  </ul></li>
+  <li><a href="#additional-resources" id="toc-additional-resources" class="nav-link" data-scroll-target="#additional-resources">Additional resources</a></li>
   </ul>
 </nav>
     </div>
 <!-- main -->
-<div class="quarto-about-solana column-body">
-  <div class="about-entity">
-    <div class="entity-contents">
-      <header id="title-block-header" class="quarto-title-block default">
-<div class="quarto-title">
-<h1 class="title">JAX Research IT, Imaging Applications team</h1>
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<section id="what-is-quarto" class="level1">
+<h1>What is Quarto?</h1>
+<p>From the <a href="https://quarto.org">Quarto</a> webpage, it is</p>
+<blockquote class="blockquote">
+<p>An open-source scientific and technical publishing system</p>
+</blockquote>
+<p>Quarto can be used to create documentation pages, scientific notebooks, professional presentations, and websites (like this one!).</p>
+<p>This system is useful for creating notes, particularly these containing Python/R <code>code</code>. And in contrast with jupyter notebooks, it offers a wide variety of ways to share these notes.</p>
+</section>
+<section id="install-quarto-on-a-remote-server-hpc" class="level1">
+<h1>Install Quarto on a remote server (HPC)</h1>
+<p>In this post, two options are presented to install Quarto on a HPC server. The first option installs Quarto on your home directory and works fine when creating code-less documents. The second option is a way to have Quarto installed in a virtual environment, which is useful for creating jupyter-like notebooks with executable code.</p>
+<section id="option-1.-install-quarto-on-your-home-directory" class="level2">
+<h2 class="anchored" data-anchor-id="option-1.-install-quarto-on-your-home-directory">Option 1. Install Quarto on your home directory</h2>
+<p>Download the Quarto source code for <em>Linux x86 Tarball</em> from their <a href="https://quarto.org/docs/download/tarball.html?version=1.5.56&amp;idPrefix=download">official website</a> into your home directory. You can download the source code by copying the address link of the download, and using <code>wget</code> to download it directly into your home directory.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
 </div>
-<div class="quarto-title-meta">
-  </div>
-</header> 
-      <div class="about-contents"><main class="content" id="quarto-document-content">
-
-<p>(imagine a really nice photo of the whole team here)</p>
-<p>We are a team of four technical experts inside the Research IT department at <a href="https://jax.org">The Jackson Laboratory</a> providing support to researchers on all their imaging data needs. Some of our offerings include:</p>
-<section id="training" class="level3">
-<h3 data-anchor-id="training">Training</h3>
-<p>We run about a dozen workshops per year on a variety of imaging-related topics, covering both specific tools and general skills, from beginner level to advanced topics. In 2024, these included, for example:</p>
-<ul>
-<li>popular tools such as Fiji, QuPath and CellProfiler;</li>
-<li>imaging data management with OMERO;</li>
-<li>Image processing with Python, from basic skills to advanced machine learning methods;</li>
-<li>How to follow coding best practices in Python.</li>
-</ul>
-</section>
-<section id="consultation" class="level3">
-<h3 data-anchor-id="consultation">Consultation</h3>
-<p>Our team is routinely in touch with Principal Investigators and their teams, assisting on image analysis projects in steps such as tool selection, pipelining, applying existing pipelines in our computational environments and so on.</p>
-</section>
-<section id="data-management-applications" class="level3">
-<h3 data-anchor-id="data-management-applications">Data management applications</h3>
-<p>We run two instances of OMERO, an open-source microscopy data management platform; one internal to JAX, for day-to-day research usage, and one cloud-based, as a public data repository. JAX researchers can move data between the two instances to publish a dataset with minimal hassle.</p>
-</section>
-<section id="expert-advice" class="level3">
-<h3 data-anchor-id="expert-advice">Expert advice</h3>
-<p>Our team takes pride in being current with the state-of-the-art on anything bioimaging, multiplying that knowledge back into the JAX community. Our researchers are rarely bioimage analysis experts, and they don’t need to be; that’s our job!</p>
-</section>
-<section id="tool-development" class="level3">
-<h3 data-anchor-id="tool-development">Tool development</h3>
-<p>We are deeply involved in the wider open-source imaging community; our team includes core developers in a wide array of tools such as <a href="https://github.com/TheJacksonLaboratory/ezomero">ezomero</a>, <a href="https://napari.org">napari</a>, <a href="https://github.com/TheJacksonLaboratory/zarrdataset">ZarrDataset</a> and <a href="https://github.com/ome/omero-cli-transfer">omero-cli-transfer</a>.</p>
-
-
-</section>
-</main></div>
-    </div>
-    <img src="posts/2024-08-05-post-template/JAX_logo_rgb_transparentback.png" class="about-image
-  rounded " style="width: 15em;">
-  </div>
+<div class="callout-title-container flex-fill">
+Tip
 </div>
- <!-- /main -->
+</div>
+<div class="callout-body-container callout-body">
+<p>Download the source code with <code>wget</code> using the following command (change <code>X.X.X</code> to the latest version available).</p>
+<pre><code>wget https://github.com/quarto-dev/quarto-cli/releases/download/vX.X.X/quarto-X.X.X-linux-amd64.tar.gz</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you are installing it in your PC, you can use the installer that matches your OS.</p>
+</div>
+</div>
+<p>Decompress the source code in a location of your preference within your home directory, like <code>/home/$USER/opt/</code>.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>You might need to create a <code>/home/$USER/opt</code> directory if it doesn’t already exist.</p>
+<pre><code>mkdir /home/$USER/opt</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Decompress the source code with <code>tar</code> by executing the following command (change the version <code>X.X.X</code> to what you are using first).</p>
+<pre><code>tar -C ~/opt -xvzf quarto-X.X.X-linux-amd64.tar.gz</code></pre>
+</div>
+</div>
+<p>Create a symbolic link to the Quarto executable inside your <code>/home/$USER/bin</code> directory.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>You might need to create a <code>/home/$USER/bin</code> directory if there is not one already as follows.</p>
+<pre><code>mkdir /home/$USER/bin</code></pre>
+<p>In general, your <code>/home/$USER/bin</code> directory should already be in your <code>PATH</code> environment variable, even if the directory didn’t exist before.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Create a symbolic link to the <code>quarto</code> executable with the following command (again, change the version <code>X.X.X</code> first).</p>
+<pre><code>ln -s /home/$USER/opt/quarto-X.X.X/bin/quarto /home/$USER/bin/quarto</code></pre>
+</div>
+</div>
+<p>Check that <code>quarto</code> is installed by executing the <code>quarto --version</code> command.</p>
+</section>
+<section id="option-2.-install-quarto-in-a-conda-virtual-environment" class="level2">
+<h2 class="anchored" data-anchor-id="option-2.-install-quarto-in-a-conda-virtual-environment">Option 2. Install Quarto in a <code>conda</code> virtual environment</h2>
+<p>For this option, you should have <code>conda</code> installed in your home directory. I recommend using <a href="https://github.com/conda-forge/miniforge">miniforge</a>.</p>
+<p>Activate the virtual environment from where you will use Quarto, i.e.&nbsp;<code>conda activate my-venv</code> (change <code>my-venv</code> with the actual name of your environment).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you don’t have a virtual environment, start by creating one instead of installing packages in the <code>base</code> environment.</p>
+</div>
+</div>
+<p>Install <code>quarto</code> from the <code>conda-forge</code> channel as follows.</p>
+<pre><code>conda install -c conda-forge quarto</code></pre>
+</section>
+</section>
+<section id="render-and-preview-documents" class="level1">
+<h1>Render and preview documents</h1>
+<p>You can render and preview your Quarto markdowns by using the following command.</p>
+<pre><code>quarto preview --no-browser --no-watch-inputs</code></pre>
+<p>That will generate the rendered versions of your markdowns. For <code>html</code>, <code>revealjs</code>, or <code>websites</code> formats, it will start a local server and provide a link that you can paste in your browser to visualize the result.</p>
+</section>
+<section id="authoring-jupyter-notebooks-with-quarto" class="level1">
+<h1>Authoring Jupyter notebooks with Quarto</h1>
+<p>Every time you render a document with Quarto, all code blocks are executed. In the case your code blocks are time-consuming, you might want to use the <code>cache</code> option in <code>quarto</code> documents. The <code>cache</code> option allows to execute cells only when a cell in the document is modified.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>That means that modifying the text around cells won’t trigger the execution of the code cells. However, if at least one cell is modified, all cells will be executed.</p>
+</div>
+</div>
+<p>To use the <code>cache</code> option, install <code>jupyter-cache</code> as follows.</p>
+<pre><code>conda install -c conda-forge jupyter-cache</code></pre>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you followed <strong>Option 2</strong> you will have to install <code>jupyter-cache</code> in these virtual environments.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Remember to activate the virtual environment where you installed quarto if you are using one.</p>
+</div>
+</div>
+</section>
+<section id="integration-with-vscode" class="level1">
+<h1>Integration with VSCode</h1>
+<p>You can author Quarto markdowns using VSCode, so you have a nice interface with code highlighting. If you have access to the HPC server, you can use the vscode module to create documents. That is particularly useful when creating jupyter-like notebooks, since you can execute the code directly on the HPC environment.</p>
+<section id="install-the-quarto-extension" class="level2">
+<h2 class="anchored" data-anchor-id="install-the-quarto-extension">Install the Quarto extension</h2>
+<p>The <a href="https://open-vsx.org/extension/quarto/quarto">VScode Quarto extension</a> adds markdowns highlighting and commands autocompletion for authoring <code>.qmd</code> files. It can render and preview the quarto markdown documents by hitting <code>Ctrl+Shift+K</code> (<code>Cmd+Shift+K</code> on Mac). You can search for the Quarto extension in the <code>Extensions</code> tab (<code>Ctrl+Shift+X</code>/<code>Cmd+Shift+X</code> on Mac).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>To enable the keyboard shortcut when followed <em>Option 2</em> to install quarto in a virtual environment, you will need to check the <code>Quarto: Use pip Quarto</code> option in the Quarto extension settings.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Restart VSCode to make sure that the extension recognizes the Quarto installation in your virtual environments.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="additional-resources" class="level1">
+<h1>Additional resources</h1>
+<p>Now that you have Quarto installed in your home directory, you can start creting your own markdown <code>.qmd</code> documents. The Quarto <a href="https://quarto.org/docs/authoring/markdown-basics.html">authoring guides</a> are the perfect place for learning!</p>
+
+
+</section>
+
+</main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
 window.document.addEventListener("DOMContentLoaded", function (event) {
   const toggleBodyColorMode = (bsSheetEl) => {
@@ -362,6 +595,13 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   } else {
     toggleColorMode(false);
   }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
   const isCodeAnnotation = (el) => {
     for (const clz of el.classList) {
       if (clz.startsWith('code-annotation-')) {                     

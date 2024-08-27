@@ -9,8 +9,241 @@
 <link>https://thejacksonlaboratory.github.io/imaging_applications/posts.html</link>
 <atom:link href="https://thejacksonlaboratory.github.io/imaging_applications/posts.xml" rel="self" type="application/rss+xml"/>
 <description>JAX RIT Imaging Applications</description>
-<generator>quarto-1.5.54</generator>
-<lastBuildDate>Mon, 05 Aug 2024 04:00:00 GMT</lastBuildDate>
+<generator>quarto-1.5.56</generator>
+<lastBuildDate>Tue, 27 Aug 2024 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Quarto on HPC</title>
+  <dc:creator>Fernando Cervantes</dc:creator>
+  <link>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-27-quarto-on-HPC/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="what-is-quarto" class="level1">
+<h1>What is Quarto?</h1>
+<p>From the <a href="https://quarto.org">Quarto</a> webpage, it is</p>
+<blockquote class="blockquote">
+<p>An open-source scientific and technical publishing system</p>
+</blockquote>
+<p>Quarto can be used to create documentation pages, scientific notebooks, professional presentations, and websites (like this one!).</p>
+<p>This system is useful for creating notes, particularly these containing Python/R <code>code</code>. And in contrast with jupyter notebooks, it offers a wide variety of ways to share these notes.</p>
+</section>
+<section id="install-quarto-on-a-remote-server-hpc" class="level1">
+<h1>Install Quarto on a remote server (HPC)</h1>
+<p>In this post, two options are presented to install Quarto on a HPC server. The first option installs Quarto on your home directory and works fine when creating code-less documents. The second option is a way to have Quarto installed in a virtual environment, which is useful for creating jupyter-like notebooks with executable code.</p>
+<section id="option-1.-install-quarto-on-your-home-directory" class="level2">
+<h2 class="anchored" data-anchor-id="option-1.-install-quarto-on-your-home-directory">Option 1. Install Quarto on your home directory</h2>
+<p>Download the Quarto source code for <em>Linux x86 Tarball</em> from their <a href="https://quarto.org/docs/download/tarball.html?version=1.5.56&amp;idPrefix=download">official website</a> into your home directory. You can download the source code by copying the address link of the download, and using <code>wget</code> to download it directly into your home directory.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Download the source code with <code>wget</code> using the following command (change <code>X.X.X</code> to the latest version available).</p>
+<pre><code>wget https://github.com/quarto-dev/quarto-cli/releases/download/vX.X.X/quarto-X.X.X-linux-amd64.tar.gz</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you are installing it in your PC, you can use the installer that matches your OS.</p>
+</div>
+</div>
+<p>Decompress the source code in a location of your preference within your home directory, like <code>/home/$USER/opt/</code>.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>You might need to create a <code>/home/$USER/opt</code> directory if it doesn’t already exist.</p>
+<pre><code>mkdir /home/$USER/opt</code></pre>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Decompress the source code with <code>tar</code> by executing the following command (change the version <code>X.X.X</code> to what you are using first).</p>
+<pre><code>tar -C ~/opt -xvzf quarto-X.X.X-linux-amd64.tar.gz</code></pre>
+</div>
+</div>
+<p>Create a symbolic link to the Quarto executable inside your <code>/home/$USER/bin</code> directory.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>You might need to create a <code>/home/$USER/bin</code> directory if there is not one already as follows.</p>
+<pre><code>mkdir /home/$USER/bin</code></pre>
+<p>In general, your <code>/home/$USER/bin</code> directory should already be in your <code>PATH</code> environment variable, even if the directory didn’t exist before.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Create a symbolic link to the <code>quarto</code> executable with the following command (again, change the version <code>X.X.X</code> first).</p>
+<pre><code>ln -s /home/$USER/opt/quarto-X.X.X/bin/quarto /home/$USER/bin/quarto</code></pre>
+</div>
+</div>
+<p>Check that <code>quarto</code> is installed by executing the <code>quarto --version</code> command.</p>
+</section>
+<section id="option-2.-install-quarto-in-a-conda-virtual-environment" class="level2">
+<h2 class="anchored" data-anchor-id="option-2.-install-quarto-in-a-conda-virtual-environment">Option 2. Install Quarto in a <code>conda</code> virtual environment</h2>
+<p>For this option, you should have <code>conda</code> installed in your home directory. I recommend using <a href="https://github.com/conda-forge/miniforge">miniforge</a>.</p>
+<p>Activate the virtual environment from where you will use Quarto, i.e.&nbsp;<code>conda activate my-venv</code> (change <code>my-venv</code> with the actual name of your environment).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you don’t have a virtual environment, start by creating one instead of installing packages in the <code>base</code> environment.</p>
+</div>
+</div>
+<p>Install <code>quarto</code> from the <code>conda-forge</code> channel as follows.</p>
+<pre><code>conda install -c conda-forge quarto</code></pre>
+</section>
+</section>
+<section id="render-and-preview-documents" class="level1">
+<h1>Render and preview documents</h1>
+<p>You can render and preview your Quarto markdowns by using the following command.</p>
+<pre><code>quarto preview --no-browser --no-watch-inputs</code></pre>
+<p>That will generate the rendered versions of your markdowns. For <code>html</code>, <code>revealjs</code>, or <code>websites</code> formats, it will start a local server and provide a link that you can paste in your browser to visualize the result.</p>
+</section>
+<section id="authoring-jupyter-notebooks-with-quarto" class="level1">
+<h1>Authoring Jupyter notebooks with Quarto</h1>
+<p>Every time you render a document with Quarto, all code blocks are executed. In the case your code blocks are time-consuming, you might want to use the <code>cache</code> option in <code>quarto</code> documents. The <code>cache</code> option allows to execute cells only when a cell in the document is modified.</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>That means that modifying the text around cells won’t trigger the execution of the code cells. However, if at least one cell is modified, all cells will be executed.</p>
+</div>
+</div>
+<p>To use the <code>cache</code> option, install <code>jupyter-cache</code> as follows.</p>
+<pre><code>conda install -c conda-forge jupyter-cache</code></pre>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>If you followed <strong>Option 2</strong> you will have to install <code>jupyter-cache</code> in these virtual environments.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Remember to activate the virtual environment where you installed quarto if you are using one.</p>
+</div>
+</div>
+</section>
+<section id="integration-with-vscode" class="level1">
+<h1>Integration with VSCode</h1>
+<p>You can author Quarto markdowns using VSCode, so you have a nice interface with code highlighting. If you have access to the HPC server, you can use the vscode module to create documents. That is particularly useful when creating jupyter-like notebooks, since you can execute the code directly on the HPC environment.</p>
+<section id="install-the-quarto-extension" class="level2">
+<h2 class="anchored" data-anchor-id="install-the-quarto-extension">Install the Quarto extension</h2>
+<p>The <a href="https://open-vsx.org/extension/quarto/quarto">VScode Quarto extension</a> adds markdowns highlighting and commands autocompletion for authoring <code>.qmd</code> files. It can render and preview the quarto markdown documents by hitting <code>Ctrl+Shift+K</code> (<code>Cmd+Shift+K</code> on Mac). You can search for the Quarto extension in the <code>Extensions</code> tab (<code>Ctrl+Shift+X</code>/<code>Cmd+Shift+X</code> on Mac).</p>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>To enable the keyboard shortcut when followed <em>Option 2</em> to install quarto in a virtual environment, you will need to check the <code>Quarto: Use pip Quarto</code> option in the Quarto extension settings.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Restart VSCode to make sure that the extension recognizes the Quarto installation in your virtual environments.</p>
+</div>
+</div>
+</section>
+</section>
+<section id="additional-resources" class="level1">
+<h1>Additional resources</h1>
+<p>Now that you have Quarto installed in your home directory, you can start creting your own markdown <code>.qmd</code> documents. The Quarto <a href="https://quarto.org/docs/authoring/markdown-basics.html">authoring guides</a> are the perfect place for learning!</p>
+
+
+</section>
+
+ ]]></description>
+  <category>HPC</category>
+  <category>Tutorials</category>
+  <guid>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-27-quarto-on-HPC/</guid>
+  <pubDate>Tue, 27 Aug 2024 00:00:00 GMT</pubDate>
+  <media:content url="https://quarto.org/quarto.png" medium="image" type="image/png"/>
+</item>
 <item>
   <title>Blog post template</title>
   <dc:creator>Erick Ratamero</dc:creator>
@@ -44,7 +277,7 @@
  ]]></description>
   <category>template</category>
   <guid>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-05-post-template/</guid>
-  <pubDate>Mon, 05 Aug 2024 04:00:00 GMT</pubDate>
+  <pubDate>Mon, 05 Aug 2024 00:00:00 GMT</pubDate>
   <media:content url="https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-05-post-template/JAX_logo_rgb_transparentback.png" medium="image" type="image/png" height="65" width="144"/>
 </item>
 </channel>

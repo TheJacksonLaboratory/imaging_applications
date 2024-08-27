@@ -1,10 +1,38 @@
 [
   {
+    "objectID": "posts/2024-08-27-quarto-on-HPC/index.html",
+    "href": "posts/2024-08-27-quarto-on-HPC/index.html",
+    "title": "Quarto on HPC",
+    "section": "",
+    "text": "From the Quarto webpage, it is\n\nAn open-source scientific and technical publishing system\n\nQuarto can be used to create documentation pages, scientific notebooks, professional presentations, and websites (like this one!).\nThis system is useful for creating notes, particularly these containing Python/R code. And in contrast with jupyter notebooks, it offers a wide variety of ways to share these notes."
+  },
+  {
+    "objectID": "posts/2024-08-27-quarto-on-HPC/index.html#option-1.-install-quarto-on-your-home-directory",
+    "href": "posts/2024-08-27-quarto-on-HPC/index.html#option-1.-install-quarto-on-your-home-directory",
+    "title": "Quarto on HPC",
+    "section": "Option 1. Install Quarto on your home directory",
+    "text": "Option 1. Install Quarto on your home directory\nDownload the Quarto source code for Linux x86 Tarball from their official website into your home directory. You can download the source code by copying the address link of the download, and using wget to download it directly into your home directory.\n\n\n\n\n\n\nTip\n\n\n\nDownload the source code with wget using the following command (change X.X.X to the latest version available).\nwget https://github.com/quarto-dev/quarto-cli/releases/download/vX.X.X/quarto-X.X.X-linux-amd64.tar.gz\n\n\n\n\n\n\n\n\nTip\n\n\n\nIf you are installing it in your PC, you can use the installer that matches your OS.\n\n\nDecompress the source code in a location of your preference within your home directory, like /home/$USER/opt/.\n\n\n\n\n\n\nTip\n\n\n\nYou might need to create a /home/$USER/opt directory if it doesn’t already exist.\nmkdir /home/$USER/opt\n\n\n\n\n\n\n\n\nTip\n\n\n\nDecompress the source code with tar by executing the following command (change the version X.X.X to what you are using first).\ntar -C ~/opt -xvzf quarto-X.X.X-linux-amd64.tar.gz\n\n\nCreate a symbolic link to the Quarto executable inside your /home/$USER/bin directory.\n\n\n\n\n\n\nTip\n\n\n\nYou might need to create a /home/$USER/bin directory if there is not one already as follows.\nmkdir /home/$USER/bin\nIn general, your /home/$USER/bin directory should already be in your PATH environment variable, even if the directory didn’t exist before.\n\n\n\n\n\n\n\n\nTip\n\n\n\nCreate a symbolic link to the quarto executable with the following command (again, change the version X.X.X first).\nln -s /home/$USER/opt/quarto-X.X.X/bin/quarto /home/$USER/bin/quarto\n\n\nCheck that quarto is installed by executing the quarto --version command."
+  },
+  {
+    "objectID": "posts/2024-08-27-quarto-on-HPC/index.html#option-2.-install-quarto-in-a-conda-virtual-environment",
+    "href": "posts/2024-08-27-quarto-on-HPC/index.html#option-2.-install-quarto-in-a-conda-virtual-environment",
+    "title": "Quarto on HPC",
+    "section": "Option 2. Install Quarto in a conda virtual environment",
+    "text": "Option 2. Install Quarto in a conda virtual environment\nFor this option, you should have conda installed in your home directory. I recommend using miniforge.\nActivate the virtual environment from where you will use Quarto, i.e. conda activate my-venv (change my-venv with the actual name of your environment).\n\n\n\n\n\n\nNote\n\n\n\nIf you don’t have a virtual environment, start by creating one instead of installing packages in the base environment.\n\n\nInstall quarto from the conda-forge channel as follows.\nconda install -c conda-forge quarto"
+  },
+  {
+    "objectID": "posts/2024-08-27-quarto-on-HPC/index.html#install-the-quarto-extension",
+    "href": "posts/2024-08-27-quarto-on-HPC/index.html#install-the-quarto-extension",
+    "title": "Quarto on HPC",
+    "section": "Install the Quarto extension",
+    "text": "Install the Quarto extension\nThe VScode Quarto extension adds markdowns highlighting and commands autocompletion for authoring .qmd files. It can render and preview the quarto markdown documents by hitting Ctrl+Shift+K (Cmd+Shift+K on Mac). You can search for the Quarto extension in the Extensions tab (Ctrl+Shift+X/Cmd+Shift+X on Mac).\n\n\n\n\n\n\nNote\n\n\n\nTo enable the keyboard shortcut when followed Option 2 to install quarto in a virtual environment, you will need to check the Quarto: Use pip Quarto option in the Quarto extension settings.\n\n\n\n\n\n\n\n\nImportant\n\n\n\nRestart VSCode to make sure that the extension recognizes the Quarto installation in your virtual environments."
+  },
+  {
     "objectID": "posts.html",
     "href": "posts.html",
     "title": "Blog",
     "section": "",
-    "text": "Blog post template\n\n\n\n\n\n\ntemplate\n\n\n\nThis is a description for your blogpost\n\n\n\n\n\nAug 5, 2024\n\n\nErick Ratamero\n\n\n\n\n\n\nNo matching items"
+    "text": "Quarto on HPC\n\n\n\n\n\n\nHPC\n\n\nTutorials\n\n\n\nA tutorial for setting up Quarto in a remote server (HPC)\n\n\n\n\n\nAug 27, 2024\n\n\nFernando Cervantes\n\n\n\n\n\n\n\n\n\n\n\n\nBlog post template\n\n\n\n\n\n\ntemplate\n\n\n\nThis is a description for your blogpost\n\n\n\n\n\nAug 5, 2024\n\n\nErick Ratamero\n\n\n\n\n\n\nNo matching items"
   },
   {
     "objectID": "index.html",
