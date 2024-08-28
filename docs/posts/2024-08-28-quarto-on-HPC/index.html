@@ -383,9 +383,6 @@ conda install -c conda-forge jupyter</code></pre>
 </div>
 <section id="select-the-jupyter-kernel" class="level2">
 <h2 class="anchored" data-anchor-id="select-the-jupyter-kernel">Select the <code>jupyter</code> kernel</h2>
-<p>If you are using Quarto with multiple virtual environments, you can select a specific <code>jupyter</code> kernel for each document. To do that, add <code>jupyter: my-venv</code> to the header of your <code>.qmd</code> file or replace the exiting <code>jupyter: pythonX</code> option if it is already set. Then, add the <code>jupyter</code> kernel of that virtual environment to the list of available kernels with the following commands.</p>
-<pre><code>conda activate my-venv
-ipython kernel install --name "my-venv" --user</code></pre>
 <div class="callout callout-style-default callout-note callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -396,9 +393,12 @@ Note
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p>If you are using <code>Option 1</code> for installing Quarto in a <code>conda</code> environment, you won’t need to specify the kernel since it will use the one available in that virtual environment.</p>
+<p>If you are using <code>Option 1</code> for installing Quarto in a <code>conda</code> environment, you won’t need to specify the kernel since it will use the one available in that virtual environment. So, you can skip this step.</p>
 </div>
 </div>
+<p>If you are using Quarto with multiple virtual environments, you can select a specific <code>jupyter</code> kernel for each document. To do that, add <code>jupyter: my-venv</code> to the header of your <code>.qmd</code> file or replace the exiting <code>jupyter: pythonX</code> option if it is already set. Then, add the <code>jupyter</code> kernel of that virtual environment to the list of available kernels with the following commands.</p>
+<pre><code>conda activate my-venv
+python -m ipykernel install --user --name "my-venv"</code></pre>
 </section>
 <section id="cache-jupyter-code-cells" class="level2">
 <h2 class="anchored" data-anchor-id="cache-jupyter-code-cells">Cache <code>jupyter</code> code cells</h2>

@@ -159,18 +159,19 @@ In my case it looks like `/home/$USER/miniforge-pypy3`. You can also add that co
 
 ## Select the `jupyter` kernel
 
+::: {.callout-note}
+If you are using `Option 1` for installing Quarto in a `conda` environment, you won't need to specify the kernel since it will use the one available in that virtual environment.
+So, you can skip this step.
+:::
+
 If you are using Quarto with multiple virtual environments, you can select a specific `jupyter` kernel for each document.
 To do that, add `jupyter: my-venv` to the header of your `.qmd` file or replace the exiting `jupyter: pythonX` option if it is already set.
 Then, add the `jupyter` kernel of that virtual environment to the list of available kernels with the following commands.
 
 ```
 conda activate my-venv
-ipython kernel install --name "my-venv" --user
+python -m ipykernel install --user --name "my-venv"
 ```
-
-::: {.callout-note}
-If you are using `Option 1` for installing Quarto in a `conda` environment, you won't need to specify the kernel since it will use the one available in that virtual environment.
-:::
 
 ## Cache `jupyter` code cells
 

@@ -32,7 +32,7 @@
     "href": "posts/2024-08-28-quarto-on-HPC/index.html#select-the-jupyter-kernel",
     "title": "Quarto on HPC",
     "section": "Select the jupyter kernel",
-    "text": "Select the jupyter kernel\nIf you are using Quarto with multiple virtual environments, you can select a specific jupyter kernel for each document. To do that, add jupyter: my-venv to the header of your .qmd file or replace the exiting jupyter: pythonX option if it is already set. Then, add the jupyter kernel of that virtual environment to the list of available kernels with the following commands.\nconda activate my-venv\nipython kernel install --name \"my-venv\" --user\n\n\n\n\n\n\nNote\n\n\n\nIf you are using Option 1 for installing Quarto in a conda environment, you won’t need to specify the kernel since it will use the one available in that virtual environment."
+    "text": "Select the jupyter kernel\n\n\n\n\n\n\nNote\n\n\n\nIf you are using Option 1 for installing Quarto in a conda environment, you won’t need to specify the kernel since it will use the one available in that virtual environment. So, you can skip this step.\n\n\nIf you are using Quarto with multiple virtual environments, you can select a specific jupyter kernel for each document. To do that, add jupyter: my-venv to the header of your .qmd file or replace the exiting jupyter: pythonX option if it is already set. Then, add the jupyter kernel of that virtual environment to the list of available kernels with the following commands.\nconda activate my-venv\npython -m ipykernel install --user --name \"my-venv\""
   },
   {
     "objectID": "posts/2024-08-28-quarto-on-HPC/index.html#cache-jupyter-code-cells",
