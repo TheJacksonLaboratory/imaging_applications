@@ -1,58 +1,51 @@
 [
   {
-    "objectID": "posts/2024-08-27-quarto-on-HPC/index.html",
-    "href": "posts/2024-08-27-quarto-on-HPC/index.html",
+    "objectID": "posts.html",
+    "href": "posts.html",
+    "title": "Blog",
+    "section": "",
+    "text": "Quarto on HPC\n\n\n\n\n\n\nHPC\n\n\nTutorials\n\n\n\nA tutorial for setting up Quarto in a remote server (HPC)\n\n\n\n\n\nAug 28, 2024\n\n\nFernando Cervantes\n\n\n\n\n\n\n\n\n\n\n\n\nBlog post template\n\n\n\n\n\n\ntemplate\n\n\n\nThis is a description for your blogpost\n\n\n\n\n\nAug 5, 2024\n\n\nErick Ratamero\n\n\n\n\n\n\nNo matching items"
+  },
+  {
+    "objectID": "posts/2024-08-28-quarto-on-HPC/index.html",
+    "href": "posts/2024-08-28-quarto-on-HPC/index.html",
     "title": "Quarto on HPC",
     "section": "",
     "text": "From the Quarto webpage, it is\n\nAn open-source scientific and technical publishing system\n\nQuarto can be used to create documentation pages, scientific notebooks, professional presentations, and websites (like this one!).\nThis system is useful for creating notes, particularly these containing Python/R code. And in contrast with jupyter notebooks, it offers a wide variety of ways to share these notes."
   },
   {
-    "objectID": "posts/2024-08-27-quarto-on-HPC/index.html#option-1.-install-quarto-on-your-home-directory",
-    "href": "posts/2024-08-27-quarto-on-HPC/index.html#option-1.-install-quarto-on-your-home-directory",
+    "objectID": "posts/2024-08-28-quarto-on-HPC/index.html#option-1.-install-quarto-in-a-conda-virtual-environment",
+    "href": "posts/2024-08-28-quarto-on-HPC/index.html#option-1.-install-quarto-in-a-conda-virtual-environment",
     "title": "Quarto on HPC",
-    "section": "Option 1. Install Quarto on your home directory",
-    "text": "Option 1. Install Quarto on your home directory\nDownload the Quarto source code for Linux x86 Tarball from their official website into your home directory. You can download the source code by copying the address link of the download, and using wget to download it directly into your home directory.\n\n\n\n\n\n\nTip\n\n\n\nDownload the source code with wget using the following command (change X.X.X to the latest version available).\nwget https://github.com/quarto-dev/quarto-cli/releases/download/vX.X.X/quarto-X.X.X-linux-amd64.tar.gz\n\n\n\n\n\n\n\n\nTip\n\n\n\nIf you are installing it in your PC, you can use the installer that matches your OS.\n\n\nDecompress the source code in a location of your preference within your home directory, like /home/$USER/opt/.\n\n\n\n\n\n\nTip\n\n\n\nYou might need to create a /home/$USER/opt directory if it doesn’t already exist.\nmkdir /home/$USER/opt\n\n\n\n\n\n\n\n\nTip\n\n\n\nDecompress the source code with tar by executing the following command (change the version X.X.X to what you are using first).\ntar -C ~/opt -xvzf quarto-X.X.X-linux-amd64.tar.gz\n\n\nCreate a symbolic link to the Quarto executable inside your /home/$USER/bin directory.\n\n\n\n\n\n\nTip\n\n\n\nYou might need to create a /home/$USER/bin directory if there is not one already as follows.\nmkdir /home/$USER/bin\nIn general, your /home/$USER/bin directory should already be in your PATH environment variable, even if the directory didn’t exist before.\n\n\n\n\n\n\n\n\nTip\n\n\n\nCreate a symbolic link to the quarto executable with the following command (again, change the version X.X.X first).\nln -s /home/$USER/opt/quarto-X.X.X/bin/quarto /home/$USER/bin/quarto\n\n\nCheck that quarto is installed by executing the quarto --version command."
+    "section": "Option 1. Install Quarto in a conda virtual environment",
+    "text": "Option 1. Install Quarto in a conda virtual environment\nFor this option you should have conda installed in your home directory. I recommend using miniforge if you don’t have conda already.\nActivate the virtual environment from where you will use Quarto, i.e. conda activate my-venv (change my-venv with the actual name of your environment).\n\n\n\n\n\n\nNote\n\n\n\nIf you don’t have a virtual environment, start by creating one instead of installing packages in the base environment.\n\n\nInstall quarto from the conda-forge channel as follows.\nconda install -c conda-forge quarto\nYou are ready to render and preview documents from the command line!"
   },
   {
-    "objectID": "posts/2024-08-27-quarto-on-HPC/index.html#option-2.-install-quarto-in-a-conda-virtual-environment",
-    "href": "posts/2024-08-27-quarto-on-HPC/index.html#option-2.-install-quarto-in-a-conda-virtual-environment",
+    "objectID": "posts/2024-08-28-quarto-on-HPC/index.html#option-2.-install-quarto-on-your-home-directory",
+    "href": "posts/2024-08-28-quarto-on-HPC/index.html#option-2.-install-quarto-on-your-home-directory",
     "title": "Quarto on HPC",
-    "section": "Option 2. Install Quarto in a conda virtual environment",
-    "text": "Option 2. Install Quarto in a conda virtual environment\nFor this option, you should have conda installed in your home directory. I recommend using miniforge.\nActivate the virtual environment from where you will use Quarto, i.e. conda activate my-venv (change my-venv with the actual name of your environment).\n\n\n\n\n\n\nNote\n\n\n\nIf you don’t have a virtual environment, start by creating one instead of installing packages in the base environment.\n\n\nInstall quarto from the conda-forge channel as follows.\nconda install -c conda-forge quarto"
+    "section": "Option 2. Install Quarto on your home directory",
+    "text": "Option 2. Install Quarto on your home directory\nDownload the Quarto source code for Linux x86 Tarball from their official website into your home directory.\nYou can download the source code by copying the address link of the download, and using wget to download it directly into your home directory.\n\n\n\n\n\n\nTip\n\n\n\nDownload the source code with wget using the following command (change X.X.X to the latest version available).\nwget https://github.com/quarto-dev/quarto-cli/releases/download/vX.X.X/quarto-X.X.X-linux-amd64.tar.gz\n\n\n\n\n\n\n\n\nTip\n\n\n\nIf you are installing it in your PC, you can use the installer that matches your OS.\n\n\nDecompress the source code in a location of your preference within your home directory, like /home/$USER/opt/.\n\n\n\n\n\n\nTip\n\n\n\nYou might need to create a /home/$USER/opt directory if it doesn’t already exist.\nmkdir /home/$USER/opt\n\n\n\n\n\n\n\n\nTip\n\n\n\nDecompress the source code with tar by executing the following command (change the version X.X.X to what you are using first).\ntar -C ~/opt -xvzf quarto-X.X.X-linux-amd64.tar.gz\n\n\nCreate a symbolic link to the Quarto executable inside your /home/$USER/bin directory.\n\n\n\n\n\n\nTip\n\n\n\nYou might need to create a /home/$USER/bin directory if there is not one already as follows.\nmkdir /home/$USER/bin\nIn general, your /home/$USER/bin directory should already be in your PATH environment variable, even if the directory didn’t already exist.\n\n\n\n\n\n\n\n\nTip\n\n\n\nCreate a symbolic link to the quarto executable with the following command (again, change the version X.X.X first).\nln -s /home/$USER/opt/quarto-X.X.X/bin/quarto /home/$USER/bin/quarto\n\n\nCheck that quarto is installed by executing the quarto --version command."
   },
   {
-    "objectID": "posts/2024-08-27-quarto-on-HPC/index.html#install-the-quarto-extension",
-    "href": "posts/2024-08-27-quarto-on-HPC/index.html#install-the-quarto-extension",
+    "objectID": "posts/2024-08-28-quarto-on-HPC/index.html#select-the-jupyter-kernel",
+    "href": "posts/2024-08-28-quarto-on-HPC/index.html#select-the-jupyter-kernel",
+    "title": "Quarto on HPC",
+    "section": "Select the jupyter kernel",
+    "text": "Select the jupyter kernel\nIf you are using Quarto with multiple virtual environments, you can select a specific jupyter kernel for each document. To do that, add jupyter: my-venv to the header of your .qmd file or replace the exiting jupyter: pythonX option if it is already set. Then, add the jupyter kernel of that virtual environment to the list of available kernels with the following commands.\nconda activate my-venv\nipython kernel install --name \"my-venv\" --user\n\n\n\n\n\n\nNote\n\n\n\nIf you are using Option 1 for installing Quarto in a conda environment, you won’t need to specify the kernel since it will use the one available in that virtual environment."
+  },
+  {
+    "objectID": "posts/2024-08-28-quarto-on-HPC/index.html#cache-jupyter-code-cells",
+    "href": "posts/2024-08-28-quarto-on-HPC/index.html#cache-jupyter-code-cells",
+    "title": "Quarto on HPC",
+    "section": "Cache jupyter code cells",
+    "text": "Cache jupyter code cells\nEvery time you render a document with Quarto, all code blocks are executed. In the case your code blocks are time-consuming, you might want to use the cache option in quarto documents. The cache option allows to execute cells only when a cell in the document is modified.\n\n\n\n\n\n\nNote\n\n\n\nThat means that modifying the text around cells won’t trigger the execution of the code cells. However, if at least one cell is modified, all cells will be executed.\n\n\nTo use the cache option, install jupyter-cache as follows.\nconda activate my-venv\nconda install -c conda-forge jupyter-cache\n\n\n\n\n\n\nNote\n\n\n\nIf you overrode the QUARTO_PYTHON variable with a virtual environment, install jupyter-cache only in that environment."
+  },
+  {
+    "objectID": "posts/2024-08-28-quarto-on-HPC/index.html#install-the-quarto-extension",
+    "href": "posts/2024-08-28-quarto-on-HPC/index.html#install-the-quarto-extension",
     "title": "Quarto on HPC",
     "section": "Install the Quarto extension",
-    "text": "Install the Quarto extension\nThe VScode Quarto extension adds markdowns highlighting and commands autocompletion for authoring .qmd files. It can render and preview the quarto markdown documents by hitting Ctrl+Shift+K (Cmd+Shift+K on Mac). You can search for the Quarto extension in the Extensions tab (Ctrl+Shift+X/Cmd+Shift+X on Mac).\n\n\n\n\n\n\nNote\n\n\n\nTo enable the keyboard shortcut when followed Option 2 to install quarto in a virtual environment, you will need to check the Quarto: Use pip Quarto option in the Quarto extension settings.\n\n\n\n\n\n\n\n\nImportant\n\n\n\nRestart VSCode to make sure that the extension recognizes the Quarto installation in your virtual environments."
-  },
-  {
-    "objectID": "posts.html",
-    "href": "posts.html",
-    "title": "Blog",
-    "section": "",
-    "text": "Quarto on HPC\n\n\n\n\n\n\nHPC\n\n\nTutorials\n\n\n\nA tutorial for setting up Quarto in a remote server (HPC)\n\n\n\n\n\nAug 27, 2024\n\n\nFernando Cervantes\n\n\n\n\n\n\n\n\n\n\n\n\nBlog post template\n\n\n\n\n\n\ntemplate\n\n\n\nThis is a description for your blogpost\n\n\n\n\n\nAug 5, 2024\n\n\nErick Ratamero\n\n\n\n\n\n\nNo matching items"
-  },
-  {
-    "objectID": "index.html",
-    "href": "index.html",
-    "title": "JAX Research IT, Imaging Applications team",
-    "section": "",
-    "text": "(imagine a really nice photo of the whole team here)\nWe are a team of four technical experts inside the Research IT department at The Jackson Laboratory providing support to researchers on all their imaging data needs. Some of our offerings include:\n\nTraining\nWe run about a dozen workshops per year on a variety of imaging-related topics, covering both specific tools and general skills, from beginner level to advanced topics. In 2024, these included, for example:\n\npopular tools such as Fiji, QuPath and CellProfiler;\nimaging data management with OMERO;\nImage processing with Python, from basic skills to advanced machine learning methods;\nHow to follow coding best practices in Python.\n\n\n\nConsultation\nOur team is routinely in touch with Principal Investigators and their teams, assisting on image analysis projects in steps such as tool selection, pipelining, applying existing pipelines in our computational environments and so on.\n\n\nData management applications\nWe run two instances of OMERO, an open-source microscopy data management platform; one internal to JAX, for day-to-day research usage, and one cloud-based, as a public data repository. JAX researchers can move data between the two instances to publish a dataset with minimal hassle.\n\n\nExpert advice\nOur team takes pride in being current with the state-of-the-art on anything bioimaging, multiplying that knowledge back into the JAX community. Our researchers are rarely bioimage analysis experts, and they don’t need to be; that’s our job!\n\n\nTool development\nWe are deeply involved in the wider open-source imaging community; our team includes core developers in a wide array of tools such as ezomero, napari, ZarrDataset and omero-cli-transfer."
-  },
-  {
-    "objectID": "posts/2024-08-05-post-template/index.html",
-    "href": "posts/2024-08-05-post-template/index.html",
-    "title": "Blog post template",
-    "section": "",
-    "text": "You can write in sections.\n\n\nMore writing!\n\n\n\nYou can add an image: \nor a link to a webpage.\nYou can also do much, much more (explore the quarto tutorials for how to add plots and data and stuff)."
-  },
-  {
-    "objectID": "posts/2024-08-05-post-template/index.html#section-1",
-    "href": "posts/2024-08-05-post-template/index.html#section-1",
-    "title": "Blog post template",
-    "section": "",
-    "text": "You can write in sections.\n\n\nMore writing!\n\n\n\nYou can add an image: \nor a link to a webpage.\nYou can also do much, much more (explore the quarto tutorials for how to add plots and data and stuff)."
+    "text": "Install the Quarto extension\nThe VScode Quarto extension adds markdowns highlighting and commands autocompletion for authoring .qmd files. It can render and preview the quarto markdown documents by hitting Ctrl Shift K (Cmd Shift K on Mac). You can search for the Quarto extension in the Extensions tab (Ctrl Shift X/Cmd Shift X on Mac).\n\n\n\n\n\n\nImportant\n\n\n\nRestart VSCode to make sure that the extension recognizes the Quarto installation in your virtual environments.\n\n\n\n\n\n\n\n\nWarning\n\n\n\nIf you followed Option 1 to install Quarto in a virtual environment the keyboard shortcut might not work. That happens because installing Quarto through conda won’t make it visible to where the extension expects it to be."
   }
 ]
