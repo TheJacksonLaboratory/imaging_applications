@@ -12,10 +12,10 @@ We are a team of four technical experts inside the Research IT department at [Th
 ### Training
 We run about a dozen workshops per year on a variety of imaging-related topics, covering both specific tools and general skills, from beginner level to advanced topics. In 2024, these included, for example:
 
-- popular tools such as Fiji, QuPath and CellProfiler;
+- popular tools such as Fiji, QuPath, CellProfiler, and napari;
 - imaging data management with OMERO;
-- Image processing with Python, from basic skills to advanced machine learning methods;
-- How to follow coding best practices in Python.
+- image processing with Python, from basic skills to advanced machine learning methods;
+- how to follow coding best practices in Python.
 
 ### Consultation
 
