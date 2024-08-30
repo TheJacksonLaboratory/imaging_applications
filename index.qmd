@@ -5,7 +5,7 @@ about:
     image: posts/2024-08-05-post-template/JAX_logo_rgb_transparentback.png
 ---
 
-(imagine a really nice photo of the whole team here)
+![](reservoir_team.png){fig-alt="Image of the team walking on a path by a reservoir"}
 
 We are a team of four technical experts inside the Research IT department at [The Jackson Laboratory](https://jax.org) providing support to researchers on all their imaging data needs. Some of our offerings include:
 

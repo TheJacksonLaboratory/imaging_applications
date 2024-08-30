@@ -10,7 +10,7 @@
 <atom:link href="https://thejacksonlaboratory.github.io/imaging_applications/posts.xml" rel="self" type="application/rss+xml"/>
 <description>JAX RIT Imaging Applications</description>
 <generator>quarto-1.5.56</generator>
-<lastBuildDate>Wed, 28 Aug 2024 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Wed, 28 Aug 2024 04:00:00 GMT</lastBuildDate>
 <item>
   <title>Quarto on HPC</title>
   <dc:creator>Fernando Cervantes</dc:creator>
@@ -282,7 +282,7 @@ Warning
   <category>HPC</category>
   <category>Tutorials</category>
   <guid>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-28-quarto-on-HPC/</guid>
-  <pubDate>Wed, 28 Aug 2024 00:00:00 GMT</pubDate>
+  <pubDate>Wed, 28 Aug 2024 04:00:00 GMT</pubDate>
   <media:content url="https://quarto.org/quarto.png" medium="image" type="image/png"/>
 </item>
 <item>
@@ -318,7 +318,7 @@ Warning
  ]]></description>
   <category>template</category>
   <guid>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-05-post-template/</guid>
-  <pubDate>Mon, 05 Aug 2024 00:00:00 GMT</pubDate>
+  <pubDate>Mon, 05 Aug 2024 04:00:00 GMT</pubDate>
   <media:content url="https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-05-post-template/JAX_logo_rgb_transparentback.png" medium="image" type="image/png" height="65" width="144"/>
 </item>
 </channel>

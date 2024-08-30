@@ -2,5 +2,17 @@
 title: "Kiya Govek"
 about:
     template: solana
-    # image: 
+    image-shape: round
+    image: kiya_profile.jpg
+    links:
+        - icon: github
+          href: https://github.com/govekk
+        - icon: linkedin
+          href: https://www.linkedin.com/in/kiyagovek
+        - text: "{{< iconify simple-icons:orcid >}}"
+          href: https://orcid.org/0000-0002-2105-0715
+        - text: "{{< iconify simple-icons:imagedotsc >}}"
+          href: https://forum.image.sc/u/govekk
 ---
+
+Kiya is a Systems Analyst on the Imaging Applications team. At JAX, she develops, deploys, and maintains containerized OMERO instances for imaging data management and public data hosting. She has a background in academic IT software development, computational single-cell next-generation sequencing research in cancer and neurobiology, and dance instruction.
