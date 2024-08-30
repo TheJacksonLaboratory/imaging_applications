@@ -47,5 +47,33 @@
     "title": "Quarto on HPC",
     "section": "Install the Quarto extension",
     "text": "Install the Quarto extension\nThe VScode Quarto extension adds markdowns highlighting and commands autocompletion for authoring .qmd files. It can render and preview the quarto markdown documents by hitting Ctrl Shift K (Cmd Shift K on Mac). You can search for the Quarto extension in the Extensions tab (Ctrl Shift X/Cmd Shift X on Mac).\n\n\n\n\n\n\nImportant\n\n\n\nRestart VSCode to make sure that the extension recognizes the Quarto installation in your virtual environments.\n\n\n\n\n\n\n\n\nWarning\n\n\n\nIf you followed Option 1 to install Quarto in a virtual environment the keyboard shortcut might not work. That happens because installing Quarto through conda won’t make it visible to where the extension expects it to be."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "JAX Research IT, Imaging Applications team",
+    "section": "",
+    "text": "We are a team of four technical experts inside the Research IT department at The Jackson Laboratory providing support to researchers on all their imaging data needs. Some of our offerings include:\n\nTraining\nWe run about a dozen workshops per year on a variety of imaging-related topics, covering both specific tools and general skills, from beginner level to advanced topics. In 2024, these included, for example:\n\npopular tools such as Fiji, QuPath, CellProfiler, and napari;\nimaging data management with OMERO;\nimage processing with Python, from basic skills to advanced machine learning methods;\nhow to follow coding best practices in Python.\n\n\n\nConsultation\nOur team is routinely in touch with Principal Investigators and their teams, assisting on image analysis projects in steps such as tool selection, pipelining, applying existing pipelines in our computational environments and so on.\n\n\nData management applications\nWe run two instances of OMERO, an open-source microscopy data management platform; one internal to JAX, for day-to-day research usage, and one cloud-based, as a public data repository. JAX researchers can move data between the two instances to publish a dataset with minimal hassle.\n\n\nExpert advice\nOur team takes pride in being current with the state-of-the-art on anything bioimaging, multiplying that knowledge back into the JAX community. Our researchers are rarely bioimage analysis experts, and they don’t need to be; that’s our job!\n\n\nTool development\nWe are deeply involved in the wider open-source imaging community; our team includes core developers in a wide array of tools such as ezomero, napari, ZarrDataset and omero-cli-transfer."
+  },
+  {
+    "objectID": "posts/2024-08-05-post-template/index.html",
+    "href": "posts/2024-08-05-post-template/index.html",
+    "title": "Blog post template",
+    "section": "",
+    "text": "You can write in sections.\n\n\nMore writing!\n\n\n\nYou can add an image: \nor a link to a webpage.\nYou can also do much, much more (explore the quarto tutorials for how to add plots and data and stuff)."
+  },
+  {
+    "objectID": "posts/2024-08-05-post-template/index.html#section-1",
+    "href": "posts/2024-08-05-post-template/index.html#section-1",
+    "title": "Blog post template",
+    "section": "",
+    "text": "You can write in sections.\n\n\nMore writing!\n\n\n\nYou can add an image: \nor a link to a webpage.\nYou can also do much, much more (explore the quarto tutorials for how to add plots and data and stuff)."
+  },
+  {
+    "objectID": "kiya.html",
+    "href": "kiya.html",
+    "title": "Kiya Govek",
+    "section": "",
+    "text": "Kiya is a Systems Analyst on the Imaging Applications team. At JAX, she develops, deploys, and maintains containerized OMERO instances for imaging data management and public data hosting. She has a background in academic IT software development, computational single-cell next-generation sequencing research in cancer and neurobiology, and dance instruction."
   }
 ]
