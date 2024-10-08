@@ -14,11 +14,11 @@ website:
         text: The Team
       - href: https://erickmartins.github.io
         text: Erick
-      - href: fernando.qmd
+      - href: personal_pages/fernando/fernando.qmd
         text: Fernando
-      - href: kiya.qmd
+      - href: personal_pages/kiya/kiya.qmd
         text: Kiya
-      - href: peter.qmd
+      - href: personal_pages/peter/peter.qmd
         text: Peter
       - posts.qmd
     right:
