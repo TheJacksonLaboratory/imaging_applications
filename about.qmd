@@ -1,7 +1,0 @@
----
-title: "The Team"
-about:
-    template: solana
-    image: posts/2024-08-05-post-template/JAX_logo_rgb_transparentback.png
----
-
