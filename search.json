@@ -1,7 +1,7 @@
 [
   {
-    "objectID": "kiya.html",
-    "href": "kiya.html",
+    "objectID": "personal_pages/kiya/kiya.html",
+    "href": "personal_pages/kiya/kiya.html",
     "title": "Kiya Govek",
     "section": "",
     "text": "Kiya is a Systems Analyst on the Imaging Applications team. At JAX, she develops, deploys, and maintains containerized OMERO instances for imaging data management and public data hosting. She has a background in academic IT software development, computational single-cell next-generation sequencing research in cancer and neurobiology, and dance instruction."
@@ -19,6 +19,13 @@
     "title": "Blog post template",
     "section": "",
     "text": "You can write in sections.\n\n\nMore writing!\n\n\n\nYou can add an image: \nor a link to a webpage.\nYou can also do much, much more (explore the quarto tutorials for how to add plots and data and stuff)."
+  },
+  {
+    "objectID": "posts.html",
+    "href": "posts.html",
+    "title": "Blog",
+    "section": "",
+    "text": "Quarto on HPC\n\n\n\n\n\n\nHPC\n\n\nTutorials\n\n\n\nA tutorial for setting up Quarto in a remote server (HPC)\n\n\n\n\n\nAug 28, 2024\n\n\nFernando Cervantes\n\n\n\n\n\n\n\n\n\n\n\n\nBlog post template\n\n\n\n\n\n\ntemplate\n\n\n\nThis is a description for your blogpost\n\n\n\n\n\nAug 5, 2024\n\n\nErick Ratamero\n\n\n\n\n\n\nNo matching items"
   },
   {
     "objectID": "index.html",
@@ -68,12 +75,5 @@
     "title": "Quarto on HPC",
     "section": "Install the Quarto extension",
     "text": "Install the Quarto extension\nThe VScode Quarto extension adds markdowns highlighting and commands autocompletion for authoring .qmd files. It can render and preview the quarto markdown documents by hitting Ctrl Shift K (Cmd Shift K on Mac). You can search for the Quarto extension in the Extensions tab (Ctrl Shift X/Cmd Shift X on Mac).\n\n\n\n\n\n\nImportant\n\n\n\nRestart VSCode to make sure that the extension recognizes the Quarto installation in your virtual environments.\n\n\n\n\n\n\n\n\nWarning\n\n\n\nIf you followed Option 1 to install Quarto in a virtual environment the keyboard shortcut might not work. That happens because installing Quarto through conda won’t make it visible to where the extension expects it to be."
-  },
-  {
-    "objectID": "posts.html",
-    "href": "posts.html",
-    "title": "Blog",
-    "section": "",
-    "text": "Quarto on HPC\n\n\n\n\n\n\nHPC\n\n\nTutorials\n\n\n\nA tutorial for setting up Quarto in a remote server (HPC)\n\n\n\n\n\nAug 28, 2024\n\n\nFernando Cervantes\n\n\n\n\n\n\n\n\n\n\n\n\nBlog post template\n\n\n\n\n\n\ntemplate\n\n\n\nThis is a description for your blogpost\n\n\n\n\n\nAug 5, 2024\n\n\nErick Ratamero\n\n\n\n\n\n\nNo matching items"
   }
 ]
