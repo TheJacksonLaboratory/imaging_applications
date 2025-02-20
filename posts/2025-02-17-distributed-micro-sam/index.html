@@ -289,8 +289,8 @@ window.Quarto = {
   </ul></li>
   <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results">5. Results</a>
   <ul class="collapse">
-  <li><a href="#comparing-both-pipelines" id="toc-comparing-both-pipelines" class="nav-link" data-scroll-target="#comparing-both-pipelines">5.1. Comparing both pipelines</a></li>
-  <li><a href="#experimenting-with-inputs-chunk-sizes" id="toc-experimenting-with-inputs-chunk-sizes" class="nav-link" data-scroll-target="#experimenting-with-inputs-chunk-sizes">5.2. Experimenting with input’s <em>chunk sizes</em></a></li>
+  <li><a href="#sec-comp-pipelines" id="toc-sec-comp-pipelines" class="nav-link" data-scroll-target="#sec-comp-pipelines">5.1. Comparing both pipelines</a></li>
+  <li><a href="#sec-comp-chunks" id="toc-sec-comp-chunks" class="nav-link" data-scroll-target="#sec-comp-chunks">5.2. Experimenting with input’s <em>chunk sizes</em></a></li>
   <li><a href="#closing-remarks" id="toc-closing-remarks" class="nav-link" data-scroll-target="#closing-remarks">5.3. Closing remarks</a></li>
   </ul></li>
   </ul>
@@ -1340,8 +1340,8 @@ Example of examination of a 512x512 pixels region of interest
 <h1>5. Results</h1>
 <p>This section presents a set of experimental results of the proposed approach applied to a test image on different configurations. The test image used in these experiments can be downloaded with the <a href="https://computational-cell-analytics.github.io/micro-sam/micro_sam/sample_data.html#fetch_wholeslide_example_data">fetch_wholeslide_example_data</a> function from the <code>micro_sam.sample_data</code> module. The example image was converted using <code>bioformats2raw</code> with different chunk sizes for comparison purposes. The <code>dask.distributed</code> cluster used for these experiments consists of a scheduler and <strong>four</strong> workers. Each worker has <span class="math inline">\(32\)</span> GB of RAM and is assigned a <strong>MIG</strong> instance with <span class="math inline">\(20\)</span> GB of VRAM from a NVIDIA A100-SXM4-80GB GPU. The example image is a <span class="math inline">\(4096\times4096\)</span> pixels <em>crop</em> from a WSI.</p>
 <p>Multiple values of <em>tile shape</em> were tested to capture different use-cases. For example, small objects (e.g.&nbsp;cells) are better segmented by using relatively small tiles (<span class="math inline">\(256\times256\)</span> pixels), while groups of objects are better captured with large <em>tile shapes</em> (e.g.&nbsp;groups of cells at <span class="math inline">\(512\times512\)</span> pixels, or even tissue at <span class="math inline">\(1024\times1024\)</span> pixels).</p>
-<section id="comparing-both-pipelines" class="level2">
-<h2 class="anchored" data-anchor-id="comparing-both-pipelines">5.1. Comparing both pipelines</h2>
+<section id="sec-comp-pipelines" class="level2">
+<h2 class="anchored" data-anchor-id="sec-comp-pipelines">5.1. Comparing both pipelines</h2>
 <p><a href="#fig-time-comparison" class="quarto-xref">Figure&nbsp;1</a> shows the elapsed time taken to segment the sample image using the <em>baseline</em> and the proposed approaches when varying the <em>tile shape</em> parameter. In <a href="#fig-count-comparison" class="quarto-xref">Figure&nbsp;2</a>, the count of the objects segmented with the different configurations is shown.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-8-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-1" role="tab" aria-controls="tabset-8-1" aria-selected="true">Boxplot</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-8-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-2" role="tab" aria-controls="tabset-8-2" aria-selected="false">Bars</a></li></ul>
@@ -1380,8 +1380,8 @@ Figure&nbsp;2: Count of segmented objects in a <span class="math inline">\(4096\
 </div>
 <p>According to the experimental results, the proposed distributed approach offers an average speed-up of <span class="math inline">\(8.10\)</span> times compared with the baseline approach, and an average increment of <span class="math inline">\(5.3 \%\)</span> of objects segmented. The increment on segmented objects is due to edge effects that cause objects in adjacent chunks be labeled with different indices. However, there exist tools for handling such edge effects which commonly involve adding <em>overlapping</em> pixels between chunks and <em>relabeling</em> objects in edge regions.</p>
 </section>
-<section id="experimenting-with-inputs-chunk-sizes" class="level2">
-<h2 class="anchored" data-anchor-id="experimenting-with-inputs-chunk-sizes">5.2. Experimenting with input’s <em>chunk sizes</em></h2>
+<section id="sec-comp-chunks" class="level2">
+<h2 class="anchored" data-anchor-id="sec-comp-chunks">5.2. Experimenting with input’s <em>chunk sizes</em></h2>
 <p>The size of the chunks handled to each <em>worker</em> also has an effect on the segmentation time. To capture different cases, the sample image was re-chunked to different <em>chunk sizes</em>: <span class="math inline">\(2048\times2048\)</span>, and <span class="math inline">\(1024\times1024\)</span> pixels per chunk. The time taken to segment the sample image and the count of segmented objects was measured for the different combinations of input’s <em>chunk sizes</em> and segmentation <em>tile shapes</em>. The results are presented in <a href="#fig-time-chunks" class="quarto-xref">Figure&nbsp;3</a> and <a href="#fig-count-chunks" class="quarto-xref">Figure&nbsp;4</a>, respectively.</p>
 <div class="tabset-margin-container"></div><div class="panel-tabset">
 <ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-9-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-1" role="tab" aria-controls="tabset-9-1" aria-selected="true">Boxplot</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-9-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-2" role="tab" aria-controls="tabset-9-2" aria-selected="false">Bars</a></li></ul>
@@ -1418,7 +1418,7 @@ Figure&nbsp;4: Count of segmented objects in a <span class="math inline">\(4096\
 </figcaption>
 </figure>
 </div>
-<p>The experimental results show that overall segmentation time is minimal when the input’s <em>chunk sizes</em> matches the segmentation <em>tile shape</em>. However, the count of segmented objects is less in smaller <em>chunks</em> compared to larger <em>chunks</em>. This is again related to edge artifacts reducing the effective count of objects close to the border of each <em>chunk</em>. This problem could be solved in a similar manner as mentioned above by usng <em>overlapping</em> pixels and relabeling algorithms.</p>
+<p>The experimental results show that overall segmentation time is minimal when the input’s <em>chunk sizes</em> matches the segmentation <em>tile shape</em>. The count of segmented objects is also greater in small <em>chunks</em> compared to larger <em>chunks</em>. However, this is related to single objects labeled with distinct indices by different <em>workers</em>. This problem can be solved in a similar manner as mentioned in <a href="#sec-comp-pipelines" class="quarto-xref">Section&nbsp;5.1</a> by using <em>overlapping</em> pixels and relabeling algorithms.</p>
 </section>
 <section id="closing-remarks" class="level2">
 <h2 class="anchored" data-anchor-id="closing-remarks">5.3. Closing remarks</h2>
@@ -1994,7 +1994,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 });
 </script>
 </div> <!-- /content -->
-<script>var lightboxQuarto = GLightbox({"loop":false,"openEffect":"zoom","closeEffect":"zoom","descPosition":"bottom","selector":".lightbox"});
+<script>var lightboxQuarto = GLightbox({"selector":".lightbox","closeEffect":"zoom","descPosition":"bottom","openEffect":"zoom","loop":false});
 (function() {
   let previousOnload = window.onload;
   window.onload = () => {
