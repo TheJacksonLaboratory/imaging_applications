@@ -1,35 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://thejacksonlaboratory.github.io/imaging_applications/personal_pages/peter/peter.html</loc>
-    <lastmod>2024-10-09T12:36:14.866Z</lastmod>
-  </url>
-  <url>
-    <loc>https://thejacksonlaboratory.github.io/imaging_applications/personal_pages/kiya/kiya.html</loc>
-    <lastmod>2024-10-09T12:36:14.866Z</lastmod>
-  </url>
-  <url>
-    <loc>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-05-post-template/index.html</loc>
-    <lastmod>2024-10-09T12:36:14.866Z</lastmod>
-  </url>
-  <url>
-    <loc>https://thejacksonlaboratory.github.io/imaging_applications/posts.html</loc>
-    <lastmod>2024-10-09T12:36:14.866Z</lastmod>
-  </url>
-  <url>
-    <loc>https://thejacksonlaboratory.github.io/imaging_applications/about.html</loc>
-    <lastmod>2024-10-09T12:36:14.866Z</lastmod>
-  </url>
-  <url>
     <loc>https://thejacksonlaboratory.github.io/imaging_applications/index.html</loc>
-    <lastmod>2024-10-09T12:36:14.866Z</lastmod>
-  </url>
-  <url>
-    <loc>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-28-quarto-on-HPC/index.html</loc>
-    <lastmod>2024-10-09T12:36:14.866Z</lastmod>
+    <lastmod>2025-02-20T14:50:32.053Z</lastmod>
   </url>
   <url>
     <loc>https://thejacksonlaboratory.github.io/imaging_applications/personal_pages/fernando/fernando.html</loc>
-    <lastmod>2024-10-09T12:36:14.866Z</lastmod>
+    <lastmod>2025-02-20T14:50:32.053Z</lastmod>
+  </url>
+  <url>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/posts.html</loc>
+    <lastmod>2025-02-20T14:50:32.056Z</lastmod>
+  </url>
+  <url>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/posts/2025-02-17-distributed-micro-sam/index.html</loc>
+    <lastmod>2025-02-20T14:50:32.057Z</lastmod>
+  </url>
+  <url>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/about.html</loc>
+    <lastmod>2025-02-20T14:50:32.053Z</lastmod>
+  </url>
+  <url>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-05-post-template/index.html</loc>
+    <lastmod>2025-02-20T14:50:32.056Z</lastmod>
+  </url>
+  <url>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/posts/2024-08-28-quarto-on-HPC/index.html</loc>
+    <lastmod>2025-02-20T14:50:32.056Z</lastmod>
+  </url>
+  <url>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/personal_pages/peter/peter.html</loc>
+    <lastmod>2025-02-20T14:50:32.056Z</lastmod>
+  </url>
+  <url>
+    <loc>https://thejacksonlaboratory.github.io/imaging_applications/personal_pages/kiya/kiya.html</loc>
+    <lastmod>2025-02-20T14:50:32.053Z</lastmod>
   </url>
 </urlset>

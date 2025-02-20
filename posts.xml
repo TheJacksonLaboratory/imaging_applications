@@ -10,7 +10,2512 @@
 <atom:link href="https://thejacksonlaboratory.github.io/imaging_applications/posts.xml" rel="self" type="application/rss+xml"/>
 <description>JAX RIT Imaging Applications</description>
 <generator>quarto-1.5.57</generator>
-<lastBuildDate>Wed, 28 Aug 2024 00:00:00 GMT</lastBuildDate>
+<lastBuildDate>Mon, 17 Feb 2025 00:00:00 GMT</lastBuildDate>
+<item>
+  <title>Distributed segmentation for Micro-SAM with Dask</title>
+  <dc:creator>Fernando Cervantes</dc:creator>
+  <link>https://thejacksonlaboratory.github.io/imaging_applications/posts/2025-02-17-distributed-micro-sam/</link>
+  <description><![CDATA[ 
+
+
+
+
+
+<section id="overview" class="level1">
+<h1>1. Overview</h1>
+<p>This guide presents an approach for scaling-up deep learning segmentation methods to be applied at Whole Slide Image (WSI) scales. Whereas this approach is more efficient on High Performance Computing (HPC) environments, the pipeline can be abstracted and executed in different computing environments, even on personal computers. Additionally, the code presented here uses <code>micro-sam</code> as segmentation method; however, this approach can be adapted to execute the inference of any other method.</p>
+<section id="segmentation-methods" class="level2">
+<h2 class="anchored" data-anchor-id="segmentation-methods">1.1. Segmentation methods</h2>
+<p>There are several methods for biological structures segmentation in images, such as <a href="https://cellpose.readthedocs.io/en/latest/index.html">Cellpose</a>, <a href="https://stardist.net/">StarDist</a>, and <a href="https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/">U-Net</a>-based methods. This tutorial will focus on <a href="https://computational-cell-analytics.github.io/micro-sam/micro_sam.html">Micro-SAM</a> which is derived from the <a href="https://segment-anything.com/">Segment Anything Model (SAM)</a> that uses a <a href="https://arxiv.org/abs/2010.11929">Vision Transformer</a> backbone and applies a set of post-processing operations to obtain a segmentation mask. While Micro-SAM already implements a <a href="https://computational-cell-analytics.github.io/micro-sam/micro_sam.html#usage-questions">tile-based pipeline</a> that applies the method to sub-regions of microscopy images, this approach has some limitations in terms of memory and computation time needed to compute a whole image since it requires all pixel data to be loaded into memory beforehand.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>At the time this guide was written, the Micro-SAM’s tile-based approach was fully sequential and therefore open for parallelization with the proposed approach.</p>
+</div>
+</div>
+</section>
+<section id="distributed-segmentation-approach" class="level2">
+<h2 class="anchored" data-anchor-id="distributed-segmentation-approach">1.2. Distributed segmentation approach</h2>
+<p>To scale-up segmentation with Micro-SAM to WSI level, the distributed computation library <a href="https://distributed.dask.org/en/stable/">Dask.distributed</a> is used. The approach consists of encapsulating the segmentation code into a function that can be applied to individual tiles at a time, extracted from the same image. These tiles, also called <em>chunks</em>, are relatively small and its segmentation requires less computational resources than segmenting the whole image at once. The image <em>chunks</em> are distributed and processed with the encapsulated segmentation process by multiple <em>workers</em> in parallel.</p>
+<p>It is important to point out that each <em>worker</em> has a copy of the Micro-SAM model. The reason is that SAM-based methods register their current input image preventing its use on multiple images at the same time. On the contrary, if a single model is shared among different <em>workers</em>, multiple tiles would be registered without synchronization leading to incorrect and undefined results.</p>
+</section>
+</section>
+<section id="dask-distributed-cluster" class="level1">
+<h1>2. Dask <code>distributed</code> cluster</h1>
+<p>A <em>cluster</em> of multiple <em>workers</em> for general purpose computation can be created using the <a href="https://distributed.dask.org/en/stable/"><code>dask.distributed</code></a> library. This guide shows how to set up a cluster on a HPC that uses <code>slurm</code> to manage jobs. Setting up the <code>dask.distributed</code> cluster in other computing environments can be done by following the corresponding instructions to <a href="https://docs.dask.org/en/stable/deploying.html">deploy a <code>dask</code> cluster</a>.</p>
+<section id="sec-slurm-job" class="level2">
+<h2 class="anchored" data-anchor-id="sec-slurm-job">2.1. Requesting an interactive job</h2>
+<p>The following command allocates a job for a cluster of multiple <strong><em>workers</em></strong> and a single <strong><em>scheduler</em></strong>. This command requests the same number of <strong>GPUs</strong> as <em>workers</em> are in the cluster; however, that depends on each HPC environment and GPUs availability.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb1" data-filename="bash" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">salloc</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--partition</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>PARTITION <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--qos</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>QOS <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb1-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--mem</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'32gb per worker and 64gb for the scheduler'</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb1-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--cpus-per-task</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'number of workers + 2'</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb1-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--gres</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>gpu:<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'number of workers'</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb1-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--time</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>6:00:00 srun <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb1-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--preserve-env</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb1-7">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--pty</span> /bin/bash</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled" title="Example command">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-2-contents" aria-controls="callout-2" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example command
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-2" class="callout-2-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>For a cluster of <img src="https://latex.codecogs.com/png.latex?4"> <em>workers</em> and <img src="https://latex.codecogs.com/png.latex?4"> GPU devices (one per <em>worker</em>) the command would be as follows:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb2" data-filename="bash" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">salloc</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--partition</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>PARTITION <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--qos</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>QOS <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb2-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--mem</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>192gb <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb2-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--cpus-per-task</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>6 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb2-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--gres</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>gpu:4 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb2-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--time</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>6:00:00 srun <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb2-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--preserve-env</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb2-7">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--pty</span> /bin/bash</span></code></pre></div>
+</div>
+<p>The requested CPUs are <img src="https://latex.codecogs.com/png.latex?4+2=6"> (<img src="https://latex.codecogs.com/png.latex?4"> workers and <img src="https://latex.codecogs.com/png.latex?2"> extra for other operations) and memory is <img src="https://latex.codecogs.com/png.latex?32*4%20+%2064=192"> GB.</p>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>PARTITION</code> and <code>QOS</code> (quality of service) names depend on the HPC environment. Make sure that such partition and quality of service enable using GPUs for accelerated computing.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Depending on your HPC environment, allocating the interactive job could involve using different commands, such as <code>sinteractive</code>.</p>
+</div>
+</div>
+</section>
+<section id="sec-dask-cluster" class="level2">
+<h2 class="anchored" data-anchor-id="sec-dask-cluster">2.2. Configuring a <code>dask.distributed</code> cluster</h2>
+<p>Once the interactive job is allocated, set some environment variables to configure the <em>cluster</em>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb3" data-filename="bash" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CLUSTER_HOST</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>XX.XX.XX.XX</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>CLUSTER_HOST</code> value can be set to the IP address of the node requested, i.e.&nbsp;<code>$(hostname -i)</code>, or simply <code>localhost</code>.</p>
+</div>
+</div>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb4" data-filename="bash" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CLUSTER_PORT</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>8786</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Any free port can be used for creating the cluster, e.g.&nbsp;<code>dask.distributed</code> uses <img src="https://latex.codecogs.com/png.latex?8786"> by default.</p>
+</div>
+</div>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb5" data-filename="bash" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">TEMP_DIR</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>/temporal/directory</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>All temporal files created by the scheduler are stored in <code>TEMP_DIR</code>. This location could be <code>/tmp</code> or any other <em>scratch</em> location.</p>
+</div>
+</div>
+</section>
+<section id="sec-scheduler-start" class="level2">
+<h2 class="anchored" data-anchor-id="sec-scheduler-start">2.3. Starting the cluster’s <em>scheduler</em></h2>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Verify that the <code>distributed</code> package is installed in the working environment with the following command.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" aria-controls="tabset-1-1" aria-selected="true">bash</a></li><li class="nav-item"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" aria-controls="tabset-1-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" aria-labelledby="tabset-1-1-tab">
+<div class="sourceCode" id="cb6" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> scheduler <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--version</span></span></code></pre></div>
+</div>
+<div id="tabset-1-2" class="tab-pane" aria-labelledby="tabset-1-2-tab">
+<div class="sourceCode" id="cb7" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec /path/to/micro-sam-container.sif dask scheduler <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--version</span></span></code></pre></div>
+</div>
+</div>
+</div>
+<p>If this does not return the version of the <code>distributed</code> package, follow the <code>dask.distributed</code>’s <a href="https://distributed.dask.org/en/stable/install.html">installation instructions</a> before continuing with this guide.</p>
+</div>
+</div>
+<p>The <em>scheduler</em> is a process responsible for assigning tiles to available <em>workers</em> in the cluster for their segmentation. Start the cluster’s <em>scheduler</em> as follows.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" aria-controls="tabset-2-1" aria-selected="true">bash</a></li><li class="nav-item"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" aria-controls="tabset-2-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-2-1" class="tab-pane active" aria-labelledby="tabset-2-1-tab">
+<div class="sourceCode" id="cb8" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> scheduler <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--host</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--port</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+<div id="tabset-2-2" class="tab-pane" aria-labelledby="tabset-2-2-tab">
+<div class="sourceCode" id="cb9" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec /path/to/micro-sam-container.sif <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb9-2">    dask scheduler <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--host</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--port</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <em>scheduler</em> does not require access to GPUs for distributing the pipeline’s tasks even if the <em>workers</em> do have access to them.</p>
+</div>
+</div>
+</section>
+<section id="sec-workers-start" class="level2">
+<h2 class="anchored" data-anchor-id="sec-workers-start">2.4. Starting the cluster’s <em>workers</em></h2>
+<p>A <em>worker</em> is a process responsible for computing the segmentation function on an image <em>chunk</em> by separate. Initiate the <em>workers</em> processes by executing the following command as many times as <em>workers</em> are in the cluster. Note that a specific GPU ID or <strong>UUID</strong> (<strong>U</strong>niversal <strong>U</strong>nique <strong>ID</strong>) will be assigned when starting each <em>worker</em> process.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" aria-controls="tabset-3-1" aria-selected="true">bash</a></li><li class="nav-item"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" aria-controls="tabset-3-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-3-1" class="tab-pane active" aria-labelledby="tabset-3-1-tab">
+<div class="sourceCode" id="cb10" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'GPU ID or UUID'</span> <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb10-2">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb10-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb10-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+<div id="tabset-3-2" class="tab-pane" aria-labelledby="tabset-3-2-tab">
+<div class="sourceCode" id="cb11" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'GPU ID or UUID'</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb11-2">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb11-3">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb11-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb11-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Any number of <em>workers</em> can be added to the cluster this way; however, it is good practice to initiate only as many workers as CPUs requested <em>less</em> a pair reserved for the scheduler and other operations. In continuation of Section&nbsp;2.1 example, this command would be executed <strong>four</strong> times.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Memory is distributed by default as the ratio of RAM and CPUs requested with <code>salloc</code> (Section&nbsp;2.1). Following the example from Section&nbsp;2.1, <img src="https://latex.codecogs.com/png.latex?192"> GB are distributed between <img src="https://latex.codecogs.com/png.latex?6"> CPUs, which is <img src="https://latex.codecogs.com/png.latex?32"> GB of RAM for each <em>worker</em> and the remainder <img src="https://latex.codecogs.com/png.latex?64"> GB reserved for the scheduler and other operations.</p>
+</div>
+</div>
+<p>This guide covers four scenarios to determine what GPU ID/UUID (if any) is assigned when starting each <em>worker</em>. Choose the scenario according to the specifications of the HPC environment used when executing this pipeline.</p>
+<ul>
+<li><strong>No GPU support</strong>. There are no GPUs assigned to this job and the process is carried out fully on CPU. For this case remove <code>CUDA_VISIBLE_DEVICES=</code> from the command used to start each <em>worker</em>.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled" title="Example for No GPUs">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-12-contents" aria-controls="callout-12" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example for No GPUs
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-12" class="callout-12-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>The commands used to start <strong>four</strong> <em>workers</em> would be the following.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" aria-controls="tabset-4-1" aria-selected="true">bash</a></li><li class="nav-item"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" aria-controls="tabset-4-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-4-1" class="tab-pane active" aria-labelledby="tabset-4-1-tab">
+<div class="sourceCode" id="cb12" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb12-4"></span>
+<span id="cb12-5"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-7">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb12-8"></span>
+<span id="cb12-9"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-10">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-11">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb12-12"></span>
+<span id="cb12-13"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-14">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb12-15">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+<div id="tabset-4-2" class="tab-pane" aria-labelledby="tabset-4-2-tab">
+<div class="sourceCode" id="cb13" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec /path/to/micro-sam-container.sif <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-2">    dask worker <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb13-5"></span>
+<span id="cb13-6"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec /path/to/micro-sam-container.sif <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-7">    dask worker <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-8">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-9">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb13-10"></span>
+<span id="cb13-11"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec /path/to/micro-sam-container.sif <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-12">    dask worker <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-13">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-14">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb13-15"></span>
+<span id="cb13-16"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec /path/to/micro-sam-container.sif <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-17">    dask worker <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-18">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb13-19">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+</div>
+</div>
+<p>Note that those commands are exactly the same.</p>
+</div>
+</div>
+</div>
+<ul>
+<li><strong>Single GPU device</strong>. This device is shared among all <em>workers</em> and should have enough virtual memory (VRAM) to fit all copies of the model generated by each <em>worker</em>. It is important to point out that because only one device is responsible for computing all operations, its compute latency could be affected negatively.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled" title="Example for single GPU">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-13-contents" aria-controls="callout-13" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example for single GPU
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-13" class="callout-13-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>Set the environment variable <code>CUDA_VISIBLE_DEVICES</code> to the ID of the only device available for all <em>workers</em>. The device ID can be obtained with the following command.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb14" data-filename="bash" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">echo</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CUDA_VISIBLE_DEVICES</span></span></code></pre></div>
+</div>
+<p>For example, if the only device available has ID <img src="https://latex.codecogs.com/png.latex?0">,</p>
+<pre><code>$ echo $CUDA_VISIBLE_DEVICES
+0</code></pre>
+<p>the commands used to start <strong>four</strong> <em>workers</em> would be the following.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" aria-controls="tabset-5-1" aria-selected="true">bash</a></li><li class="nav-item"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" aria-controls="tabset-5-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-5-1" class="tab-pane active" aria-labelledby="tabset-5-1-tab">
+<div class="sourceCode" id="cb16" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>0 <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-2">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb16-5"></span>
+<span id="cb16-6"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>0 <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-7">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-8">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-9">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb16-10"></span>
+<span id="cb16-11"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>0 <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-12">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-13">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-14">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb16-15"></span>
+<span id="cb16-16"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>0 <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-17">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-18">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb16-19">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+<div id="tabset-5-2" class="tab-pane" aria-labelledby="tabset-5-2-tab">
+<div class="sourceCode" id="cb17" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-2">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-3">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb17-6"></span>
+<span id="cb17-7"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-8">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-9">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-10">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-11">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb17-12"></span>
+<span id="cb17-13"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-14">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-15">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-16">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-17">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb17-18"></span>
+<span id="cb17-19"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-20">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-21">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-22">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb17-23">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+</div>
+</div>
+<p>Note that those commands are exactly the same since these are using the same GPU.</p>
+</div>
+</div>
+</div>
+<ul>
+<li><strong>Multiple physical GPU devices</strong>. These devices are assigned to different <em>workers</em>, most ideally one GPU device per <em>worker</em>. This would allow us to keep the GPUs computing latency unaffected. Additionally, devices with less virtual memory could be used since only one model will be hosted per GPU.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled" title="Example for multiple GPUs">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-14-contents" aria-controls="callout-14" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example for multiple GPUs
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-14" class="callout-14-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>Set the environment variable <code>CUDA_VISIBLE_DEVICES</code> to a different ID for each <em>worker</em>. Use the following command to get the GPU IDs.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb18" data-filename="bash" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb18-1"><span class="bu" style="color: null;
+background-color: null;
+font-style: inherit;">echo</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CUDA_VISIBLE_DEVICES</span></span></code></pre></div>
+</div>
+<p>For example, if the device IDs are <img src="https://latex.codecogs.com/png.latex?0">, <img src="https://latex.codecogs.com/png.latex?1">, <img src="https://latex.codecogs.com/png.latex?2">, and <img src="https://latex.codecogs.com/png.latex?3">,</p>
+<pre><code>$ echo $CUDA_VISIBLE_DEVICES
+0,1,2,3</code></pre>
+<p>the commands used to start <strong>four</strong> <em>workers</em> would be the following.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-6-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-1" aria-controls="tabset-6-1" aria-selected="true">bash</a></li><li class="nav-item"><a class="nav-link" id="tabset-6-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-2" aria-controls="tabset-6-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-6-1" class="tab-pane active" aria-labelledby="tabset-6-1-tab">
+<div class="sourceCode" id="cb20" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>0 <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-2">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb20-5"></span>
+<span id="cb20-6"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>1 <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-7">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-8">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-9">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb20-10"></span>
+<span id="cb20-11"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>2 <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-12">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-13">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-14">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb20-15"></span>
+<span id="cb20-16"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>3 <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-17">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-18">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb20-19">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+<div id="tabset-6-2" class="tab-pane" aria-labelledby="tabset-6-2-tab">
+<div class="sourceCode" id="cb21" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb21-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=0 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-2">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-3">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb21-6"></span>
+<span id="cb21-7"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-8">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-9">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-10">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-11">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb21-12"></span>
+<span id="cb21-13"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=2 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-14">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-15">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-16">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-17">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb21-18"></span>
+<span id="cb21-19"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=3 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-20">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-21">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-22">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb21-23">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<ul>
+<li><strong>Multi-Instance GPUs (MIG)</strong>. This leverages the <a href="https://www.nvidia.com/en-us/technologies/multi-instance-gpu/">MIG</a> functionality of certain GPU devices. In this pipeline, a distinct MIG is assigned to each different <em>workers</em> as if these were physical devices.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled" title="Example for MIGs">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-15-contents" aria-controls="callout-15" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example for MIGs
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-15" class="callout-15-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>Set the environment variable <code>CUDA_VISIBLE_DEVICES</code> to point to a different <em>instance</em> <strong>UUID</strong> when starting each <em>worker</em>. Instances’ UUIDs can be obtained with the following command.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb22" data-filename="bash" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb22-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">nvidia-smi</span> <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">-L</span></span></code></pre></div>
+</div>
+<p>For example, if the MIGs’ <strong>UUID</strong>s are</p>
+<ul>
+<li><p><code>MIG-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb</code>,</p></li>
+<li><p><code>MIG-cccccccc-cccc-cccc-cccc-cccccccccccc</code>,</p></li>
+<li><p><code>MIG-dddddddd-dddd-dddd-dddd-dddddddddddd</code>, and</p></li>
+<li><p><code>MIG-eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee</code>,</p></li>
+</ul>
+<pre><code>$ nvidia-smi -L
+GPU 0: A100-SXM4-40GB (UUID: GPU-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)
+  MIG 1g.5gb      Device  0: (UUID: MIG-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb)
+  MIG 1g.5gb      Device  1: (UUID: MIG-cccccccc-cccc-cccc-cccc-cccccccccccc)
+  MIG 1g.5gb      Device  2: (UUID: MIG-dddddddd-dddd-dddd-dddd-dddddddddddd)
+  MIG 1g.5gb      Device  3: (UUID: MIG-eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee)</code></pre>
+<p>the commands used to start <strong>four</strong> <em>workers</em> would be the following.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-7-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-1" aria-controls="tabset-7-1" aria-selected="true">bash</a></li><li class="nav-item"><a class="nav-link" id="tabset-7-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-2" aria-controls="tabset-7-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-7-1" class="tab-pane active" aria-labelledby="tabset-7-1-tab">
+<div class="sourceCode" id="cb24" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb24-1"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>MIG-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-2">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-3">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-4">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb24-5"></span>
+<span id="cb24-6"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>MIG-cccccccc-cccc-cccc-cccc-cccccccccccc <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-7">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-8">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-9">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb24-10"></span>
+<span id="cb24-11"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>MIG-dddddddd-dddd-dddd-dddd-dddddddddddd <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-12">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-13">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-14">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb24-15"></span>
+<span id="cb24-16"><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">CUDA_VISIBLE_DEVICES</span><span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>MIG-eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee <span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">dask</span> worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-17">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-18">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb24-19">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+<div id="tabset-7-2" class="tab-pane" aria-labelledby="tabset-7-2-tab">
+<div class="sourceCode" id="cb25" style="background: #f1f3f5;"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb25-1"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-2">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=MIG-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-3">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-4">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-5">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-6">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb25-7"></span>
+<span id="cb25-8"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-9">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=MIG-cccccccc-cccc-cccc-cccc-cccccccccccc <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-10">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-11">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-12">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-13">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb25-14"></span>
+<span id="cb25-15"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-16">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=MIG-dddddddd-dddd-dddd-dddd-dddddddddddd <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-17">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-18">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-19">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-20">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span>
+<span id="cb25-21"></span>
+<span id="cb25-22"><span class="ex" style="color: null;
+background-color: null;
+font-style: inherit;">singularity</span> exec <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nv</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-23">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--env</span> CUDA_VISIBLE_DEVICES=MIG-eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-24">    /path/to/micro-sam-container.sif dask worker <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-25">    <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_HOST</span>:<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$CLUSTER_PORT</span> <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-26">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--nthreads</span> 1 <span class="dt" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">\</span></span>
+<span id="cb25-27">    <span class="at" style="color: #657422;
+background-color: null;
+font-style: inherit;">--local-directory</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">$TEMP_DIR</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">&amp;</span></span></code></pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="sec-dist-segmentation" class="level1">
+<h1>3. Distributed segmentation</h1>
+<p>The remainder of this guide is intended to be executed in Python, either in an interactive session or a <code>jupyter</code> notebook.</p>
+<section id="sec-segmentation-fun" class="level2">
+<h2 class="anchored" data-anchor-id="sec-segmentation-fun">3.1. Encapsulating <code>micro-sam</code> segmentation function</h2>
+<p>The encapsulated segmentation function comprises two operations: 1) model initialization, and 2) segmentation mask computation. For this method the time required to initialize the deep learning model is negligible compared to the segmentation process. Additionally, by keeping the model within the scope of the segmentation function it is ensured that a single model is instantiated for each <em>worker</em> preventing clashing.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb26" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> micro_sam.util <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> get_device</span>
+<span id="cb26-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> micro_sam.automatic_segmentation <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> get_predictor_and_segmenter, automatic_instance_segmentation</span>
+<span id="cb26-3"></span>
+<span id="cb26-4"><span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">def</span> sam_segment_chunk(im_chunk, model_type<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"vit_h"</span>, tile_shape<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>, halo<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>, use_gpu<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span>, block_info<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>):</span>
+<span id="cb26-5">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">"""Encapsulated segmentation function</span></span>
+<span id="cb26-6"></span>
+<span id="cb26-7"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">       Parameters</span></span>
+<span id="cb26-8"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">       ----------</span></span>
+<span id="cb26-9"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">       im_chunk : array_like</span></span>
+<span id="cb26-10"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">           Tile or chunk on which the segmentation methods is applied.</span></span>
+<span id="cb26-11"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">       model_type : str</span></span>
+<span id="cb26-12"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">           The type of model used for segmentation.</span></span>
+<span id="cb26-13"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">           Visit https://computational-cell-analytics.github.io/micro-sam/micro_sam.html#finetuned-models for a full list of models.</span></span>
+<span id="cb26-14"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">       tile_shape : tuple, optional</span></span>
+<span id="cb26-15"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">           Shape of the tiles for tiled prediction. By default, prediction is run without tiling.</span></span>
+<span id="cb26-16"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">       halo : tuple, optional</span></span>
+<span id="cb26-17"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">           Overlap of the tiles for tiled prediction.</span></span>
+<span id="cb26-18"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">       use_gpu : bool</span></span>
+<span id="cb26-19"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">           Whether use GPU for acceleration or not.</span></span>
+<span id="cb26-20"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">       block_info : dict, optional</span></span>
+<span id="cb26-21"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">           Describes the location of the current chunk in reference to the whole array.</span></span>
+<span id="cb26-22"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">           This is exclusively used by the `map_blocks` function and does not require to be set by the user.</span></span>
+<span id="cb26-23"></span>
+<span id="cb26-24"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">       Returns</span></span>
+<span id="cb26-25"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">       -------</span></span>
+<span id="cb26-26"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">       segmentation_mask : array_like</span></span>
+<span id="cb26-27"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">           A two-dimensional segmentation mask.</span></span>
+<span id="cb26-28"><span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">    """</span></span>
+<span id="cb26-29">    sam_predictor, sam_instance_segmenter <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> get_predictor_and_segmenter(</span>
+<span id="cb26-30">        model_type<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>model_type,</span>
+<span id="cb26-31">        device<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>get_device(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cuda"</span> <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">if</span> use_gpu <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">else</span> <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"cpu"</span>),</span>
+<span id="cb26-32">        amg<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb26-33">        checkpoint<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>,</span>
+<span id="cb26-34">        is_tiled<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>tile_shape <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">is</span> <span class="kw" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">not</span> <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>,</span>
+<span id="cb26-35">        stability_score_offset<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1.0</span></span>
+<span id="cb26-36">    )</span>
+<span id="cb26-37"></span>
+<span id="cb26-38">    segmentation_mask <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> automatic_instance_segmentation(</span>
+<span id="cb26-39">        predictor<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>sam_predictor,</span>
+<span id="cb26-40">        segmenter<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>sam_instance_segmenter,</span>
+<span id="cb26-41">        input_path<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>im_chunk[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, :, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>].transpose(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>),</span>
+<span id="cb26-42">        ndim<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>,</span>
+<span id="cb26-43">        tile_shape<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>tile_shape,</span>
+<span id="cb26-44">        halo<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>halo,</span>
+<span id="cb26-45">        verbose<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb26-46">    )</span>
+<span id="cb26-47"></span>
+<span id="cb26-48">    <span class="co" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;"># Offset the segmentation indices to prevent aliasing with other chunks</span></span>
+<span id="cb26-49">    chunk_idx <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> np.ravel_multi_index(</span>
+<span id="cb26-50">        block_info[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'chunk-location'</span>],</span>
+<span id="cb26-51">        block_info[<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'num-chunks'</span>]</span>
+<span id="cb26-52">    )</span>
+<span id="cb26-53"></span>
+<span id="cb26-54">    segmentation_mask <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> np.where(</span>
+<span id="cb26-55">        segmentation_mask,</span>
+<span id="cb26-56">        segmentation_mask <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> chunk_idx <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">*</span> (<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">**</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">32</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>),</span>
+<span id="cb26-57">        <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span></span>
+<span id="cb26-58">    )</span>
+<span id="cb26-59"></span>
+<span id="cb26-60">    <span class="cf" style="color: #003B4F;
+background-color: null;
+font-weight: bold;
+font-style: inherit;">return</span> segmentation_mask</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The input chunk <code>im_chunk</code> is expected to have axes “TCZYX” following the <a href="https://ome-model.readthedocs.io/en/stable/ome-tiff/specification.html">OME-TIFF specification</a>. This makes this pipeline compatible with images converted to the <a href="https://zarr.dev/">Zarr</a> format with <a href="https://github.com/glencoesoftware/bioformats2raw"><code>bioformats2raw</code></a> converter. When calling the <code>automatic_instance_segmentation</code> function from <code>micro-sam</code>, the input’s axes are <em>squeezed</em> and transposed to have “YXC” order as expected.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The encapsulated function uses Micro-SAM’s tile-based pipeline internally when <code>tile_shape</code> is different from <code>None</code>. That allows us to maintain the behavior close to the original while keeping the process parallelizable.</p>
+</div>
+</div>
+</section>
+<section id="opening-an-image-with-dask" class="level2">
+<h2 class="anchored" data-anchor-id="opening-an-image-with-dask">3.2. Opening an image with <code>dask</code></h2>
+<p>The input image will be loaded as a <code>dask.array</code> which allows its manipulation in a <em>lazy</em> manner. For more information about the <code>dask.array</code> module visit the official <a href="https://docs.dask.org/en/stable/array.html">documentation site</a>.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Lazy loading permits opening only the regions of the image that are being computed at a certain time. Because this process is applied in parallel to individual <em>chunks</em> of the image, instead to the whole image, the overall memory required for segmentation is reduced significatively.</p>
+</div>
+</div>
+<p>An image can be opened from disk using the <a href="https://github.com/cgohlke/tifffile/"><code>tifffile</code></a> library and be passed to <code>dask.array</code> to retrieve the pixel data lazily. The axes of the image array are ordered following the OME-TIFF specification to “TCZYX”. This order stands for <strong>T</strong>ime, <strong>C</strong>hannel, and the <strong>Z</strong>, <strong>Y</strong>, <strong>X</strong> spatial dimensions.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>tifffile</code> library was historically installed by <a href="https://scikit-image.org/"><code>scikit-image</code></a> as dependency of its <code>skimage.io</code> module, and is now used as plugin by the <a href="https://imageio.readthedocs.io/en/stable/"><code>imageio</code></a> library as well.</p>
+</div>
+</div>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb27" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> tifffile</span>
+<span id="cb27-2"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> dask.array <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> da</span>
+<span id="cb27-3"></span>
+<span id="cb27-4">im_fp <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> tifffile.imread(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/path/to/image/file"</span>, aszarr<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>)</span>
+<span id="cb27-5">im <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> da.from_zarr(im_fp)</span>
+<span id="cb27-6"></span>
+<span id="cb27-7">im <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> im.transpose(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>)[<span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>, :, <span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">None</span>, ...]</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>By using <code>aszarr=True</code> argument, the image file is opened as it was a Zarr file allowing to load <em>chunks</em> lazily with the <code>dask.array.from_zarr</code> function.</p>
+</div>
+</div>
+<section id="convert-input-image-to-zarr-optional" class="level3">
+<h3 class="anchored" data-anchor-id="convert-input-image-to-zarr-optional">3.2.1. Convert input image to Zarr (Optional)</h3>
+<p>Alternatively, the input image file can be converted into the Zarr format using converters such as <code>bioformats2raw</code>. That way, the pixel data can be retrieved directly from the file on disk with <code>dask.array.from_zarr</code>. Moreover, if <code>bioformats2raw</code> is used to convert the image, its dimensions will be already in the expected “TCZYX” order.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb28" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> dask.array <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> da</span>
+<span id="cb28-2"></span>
+<span id="cb28-3">im <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> da.from_zarr(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/path/to/zarr/file.zarr"</span>, component<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"0/0"</span>)</span></code></pre></div>
+</div>
+</section>
+<section id="re-chunk-tiles-to-contain-all-channels" class="level3">
+<h3 class="anchored" data-anchor-id="re-chunk-tiles-to-contain-all-channels">3.2.2. Re-chunk tiles to contain all channels</h3>
+<p>When converting multi-channel images to the Zarr format, it is usual to channels be split into sperate chunks. However, the segmentation function defined in Section&nbsp;3.1 requires all color channels to be in the same chunk. Therefore, the <code>rechunk</code> method from <code>dask.array.Array</code> objects is used to merge the image’s channels as follows.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb29" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1">im <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> im.rechunk({<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>: <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>})</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The axis at index <img src="https://latex.codecogs.com/png.latex?1"> corresponds to the <strong>C</strong>hannel dimension in the “TCZYX” ordering.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled" title="Example change chunk spatial size">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-22-contents" aria-controls="callout-22" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example change chunk spatial size
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-22" class="callout-22-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>The size of the chunks processed by each <em>worker</em> can be modified to match different use-cases, such as smaller or larger chunks depending the available computing resources.</p>
+<p>For example, if chunks of size <img src="https://latex.codecogs.com/png.latex?4096%5Ctimes4096"> pixels would be used istead of the original’s chunk spatial size, the image would be re-chunked as follows:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb30" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1">im <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> im.rechunk({<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>: <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">3</span>: <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4096</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4</span>: <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">4096</span>})</span></code></pre></div>
+</div>
+<p>The axes at indices <img src="https://latex.codecogs.com/png.latex?3"> and <img src="https://latex.codecogs.com/png.latex?4"> corresponds respectively to the <strong>Y</strong> and <strong>X</strong> spatial dimensions in the “TCZYX” ordering.</p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="sec-create-map-blocks" class="level2">
+<h2 class="anchored" data-anchor-id="sec-create-map-blocks">3.3. Generating a distributed process for lazy computation</h2>
+<p>The segmentation pipeline is submitted for computation using the <a href="https://docs.dask.org/en/stable/generated/dask.array.Array.map_blocks.html#dask.array.Array.map_blocks"><code>map_blocks</code></a> function from the <code>dask.array</code> module. This function distributes the image tiles across all <em>workers</em> for their segmentation and merges the results back into a single array.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb31" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1">seg_labels <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> da.map_blocks(</span>
+<span id="cb31-2">    sam_segment_chunk,</span>
+<span id="cb31-3">    im,</span>
+<span id="cb31-4">    model_type<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"vit_b_lm"</span>,</span>
+<span id="cb31-5">    use_gpu<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb31-6">    tile_shape<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1024</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1024</span>],</span>
+<span id="cb31-7">    halo<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>],</span>
+<span id="cb31-8">    drop_axis<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>),</span>
+<span id="cb31-9">    chunks<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>im.chunks[<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">-</span><span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>:],</span>
+<span id="cb31-10">    dtype<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>np.int64,</span>
+<span id="cb31-11">    meta<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>np.empty((<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>,), dtype<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span>np.int64)</span>
+<span id="cb31-12">)</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The type of model used for segmentation as well as the <em>tile shape</em> and <em>halo</em> parameters can be modified according to the user needs.</p>
+</div>
+</div>
+<p>The resulting <code>seg_labels</code> array can be set to be stored into a Zarr file directly. This avoids retaining the whole segmentation array on memory unnecessarily.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb32" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1">seg_labels <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> seg_labels.to_zarr(</span>
+<span id="cb32-2">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/path/to/segmentation/output.zarr"</span>,</span>
+<span id="cb32-3">    component<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"0/0"</span>,</span>
+<span id="cb32-4">    overwrite<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">True</span>,</span>
+<span id="cb32-5">    compute<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="va" style="color: #111111;
+background-color: null;
+font-style: inherit;">False</span></span>
+<span id="cb32-6">)</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Note that the <code>seg_labels.to_zarr</code> method is called with parameter <code>compute=False</code>.</p>
+</div>
+</div>
+</section>
+<section id="submitting-graph-for-computation" class="level2">
+<h2 class="anchored" data-anchor-id="submitting-graph-for-computation">3.4. Submitting graph for computation</h2>
+<p>The operations in the previous Section&nbsp;3.3 defined a graph of tasks that are waiting to be executed by a <em>scheduler</em>.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This process is called <em>scheduling</em> and its detailed description can be found at <code>dask</code>’s <a href="https://docs.dask.org/en/stable/scheduling.html">official documentation</a>.</p>
+</div>
+</div>
+<p>To use the <em>cluster</em> created in Section&nbsp;2.3 use the following command.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb33" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">from</span> dask.distributed <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> Client</span>
+<span id="cb33-2"></span>
+<span id="cb33-3">client <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> Client(<span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">'CLUSTER_HOST:CLUSTER_PORT'</span>)</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Set the <code>CLUSTER_HOST</code> and <code>CLUSTER_PORT</code> used in Section&nbsp;2.2 to create the cluster.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>Dask</code> will use a <em>single-machine scheduler</em> for executing the graph of tasks by default, so make sure the <code>client</code> is connected before computing the graph.</p>
+</div>
+</div>
+<p>In interactive notebooks (e.g.&nbsp;<code>jupyter</code>) cluster’s information can be displayed by calling the <code>client</code> as follows.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb34" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1">client</span></code></pre></div>
+</div>
+<p><a href="imgs/client_info.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1"><img src="https://thejacksonlaboratory.github.io/imaging_applications/posts/2025-02-17-distributed-micro-sam/imgs/client_info.png" class="img-fluid"></a></p>
+<p>Finally, execute the pipeline by calling the <code>seg_labels.compute()</code> method.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb35" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1">_ <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> seg_labels.compute()</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The pipeline’s elapsed time depends on the computing resources of the cluster and the size of the input image. It can even take a couple of hours to process a Whole Slide Image (WSI).</p>
+</div>
+</div>
+</section>
+<section id="viewing-cluster-statistics" class="level2">
+<h2 class="anchored" data-anchor-id="viewing-cluster-statistics">3.5. Viewing cluster statistics</h2>
+<p>Use the address shown by the <code>client</code> under “Dashboard” to monitor the cluster’s status while the process is running. This tool allows us to visualize the task’s progress and overall usage of the cluster’s resources.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The Dashboard can be accessed through <code>http://CLUSTER_HOST:8787/status</code>. Note that the port <img src="https://latex.codecogs.com/png.latex?8787"> is used by default; however, in case that port <img src="https://latex.codecogs.com/png.latex?8787"> is already in use a random port will be generated. The port can be specified when starting the <em>scheduler</em> with the <code>--dashboard-address</code> argument.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This dashboard may not show the usage of the GPUs, for what the <code>nvidia-smi</code> command can be used instead.</p>
+</div>
+</div>
+</section>
+<section id="shutting-down-the-dask.distributed-cluster" class="level2">
+<h2 class="anchored" data-anchor-id="shutting-down-the-dask.distributed-cluster">3.6. Shutting down the <code>dask.distributed</code> cluster</h2>
+<p>After the whole process has finished, execute the command below to shut down the cluster. This will safely terminate the <em>scheduler</em> process and all <em>workers</em> associated with it.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb36" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1">client.shutdown()</span></code></pre></div>
+</div>
+</section>
+</section>
+<section id="examine-output-segmentation" class="level1">
+<h1>4. Examine output segmentation</h1>
+<p>The output of this pipeline is stored in Zarr format and can be opened with any software supporting it. Some image analysis that have support for opening Zarr files are <a href="https://qupath.github.io/">QPath</a>, <a href="https://imagej.net/software/fiji/">Fiji/ImageJ</a>, <a href="https://napari.org/stable/">napari</a>, <a href="https://github.com/hms-dbmi/vizarr">vizarr</a>, etc.</p>
+<section id="loading-regions-from-disk-with-dask" class="level2">
+<h2 class="anchored" data-anchor-id="loading-regions-from-disk-with-dask">4.1. Loading regions from disk with <code>dask</code></h2>
+<p>A similar approach to opening the input image can be used to load the resulting segmentation output in Python or <code>jupyter</code>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb37" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1">seg_labels <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span> da.from_zarr(</span>
+<span id="cb37-2">    <span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"/path/to/segmentation/output.zarr"</span>,</span>
+<span id="cb37-3">    component<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="st" style="color: #20794D;
+background-color: null;
+font-style: inherit;">"0/0"</span></span>
+<span id="cb37-4">)</span></code></pre></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>It is recommended to examine relatively small regions of the input image and resulting segmentation instead of the whole extent of the images to prevent running out of memory.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Example of examination of a 512x512 pixels region of interest">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-32-contents" aria-controls="callout-32" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example of examination of a 512x512 pixels region of interest
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-32" class="callout-32-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>In the following code a region of interest (ROI) of size <img src="https://latex.codecogs.com/png.latex?256%5Ctimes256"> pixels at pixel coordinates (<img src="https://latex.codecogs.com/png.latex?512">, <img src="https://latex.codecogs.com/png.latex?512">) is examined.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb38" data-filename="python" style="background: #f1f3f5;"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">import</span> matplotlib.pyplot <span class="im" style="color: #00769E;
+background-color: null;
+font-style: inherit;">as</span> plt</span>
+<span id="cb38-2"></span>
+<span id="cb38-3">plt.imshow(im[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, :, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">512</span>:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">512</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">512</span>:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">512</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>].transpose(<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">1</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">2</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0</span>))</span>
+<span id="cb38-4">plt.imshow(seg_labels[<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">512</span>:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">512</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>, <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">512</span>:<span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">512</span> <span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">+</span> <span class="dv" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">256</span>], alpha<span class="op" style="color: #5E5E5E;
+background-color: null;
+font-style: inherit;">=</span><span class="fl" style="color: #AD0000;
+background-color: null;
+font-style: inherit;">0.5</span>)</span>
+<span id="cb38-5">plt.show()</span></code></pre></div>
+</div>
+<p>The input image is assumed to be stored following the OME specification; therefore, its axes require to be transposed before calling the <code>imshow</code> function.</p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="results" class="level1">
+<h1>5. Results</h1>
+<p>This section presents a set of experimental results of the proposed approach applied to a test image on different configurations. The test image used in these experiments can be downloaded with the <a href="https://computational-cell-analytics.github.io/micro-sam/micro_sam/sample_data.html#fetch_wholeslide_example_data">fetch_wholeslide_example_data</a> function from the <code>micro_sam.sample_data</code> module. The example image was converted using <code>bioformats2raw</code> with different chunk sizes for comparison purposes. The <code>dask.distributed</code> cluster used for these experiments consists of a scheduler and <strong>four</strong> workers. Each worker has <img src="https://latex.codecogs.com/png.latex?32"> GB of RAM and is assigned a <strong>MIG</strong> instance with <img src="https://latex.codecogs.com/png.latex?20"> GB of VRAM from a NVIDIA A100-SXM4-80GB GPU. The example image is a <img src="https://latex.codecogs.com/png.latex?4096%5Ctimes4096"> pixels <em>crop</em> from a WSI.</p>
+<p>Multiple values of <em>tile shape</em> were tested to capture different use-cases. For example, small objects (e.g.&nbsp;cells) are better segmented by using relatively small tiles (<img src="https://latex.codecogs.com/png.latex?256%5Ctimes256"> pixels), while groups of objects are better captured with large <em>tile shapes</em> (e.g.&nbsp;groups of cells at <img src="https://latex.codecogs.com/png.latex?512%5Ctimes512"> pixels, or even tissue at <img src="https://latex.codecogs.com/png.latex?1024%5Ctimes1024"> pixels).</p>
+<section id="comparing-both-pipelines" class="level2">
+<h2 class="anchored" data-anchor-id="comparing-both-pipelines">5.1. Comparing both pipelines</h2>
+<p>Figure&nbsp;1 shows the elapsed time taken to segment the sample image using the <em>baseline</em> and the proposed approaches when varying the <em>tile shape</em> parameter. In Figure&nbsp;2, the count of the objects segmented with the different configurations is shown.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-8-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-1" aria-controls="tabset-8-1" aria-selected="true">Boxplot</a></li><li class="nav-item"><a class="nav-link" id="tabset-8-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-2" aria-controls="tabset-8-2" aria-selected="false">Bars</a></li></ul>
+<div class="tab-content">
+<div id="tabset-8-1" class="tab-pane active" aria-labelledby="tabset-8-1-tab">
+<div id="fig-time-comparison" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-time-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/distributed_time_comparison.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Figure&nbsp;1: Elapsed time for segmenting a 4096\times4096 pixels sample image with different tile shapes (1024\times1024, 512\times512, and 256\times256 pixels), using the baseline pipeline and the proposed distributed pipeline."><img src="https://thejacksonlaboratory.github.io/imaging_applications/posts/2025-02-17-distributed-micro-sam/imgs/distributed_time_comparison.svg" class="img-fluid figure-img"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-time-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Elapsed time for segmenting a <img src="https://latex.codecogs.com/png.latex?4096%5Ctimes4096"> pixels sample image with different <em>tile shapes</em> (<img src="https://latex.codecogs.com/png.latex?1024%5Ctimes1024">, <img src="https://latex.codecogs.com/png.latex?512%5Ctimes512">, and <img src="https://latex.codecogs.com/png.latex?256%5Ctimes256"> pixels), using the baseline pipeline and the proposed distributed pipeline.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-8-2" class="tab-pane" aria-labelledby="tabset-8-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="imgs/distributed_time_comparison_bar.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="Figure 1: Elapsed time for segmenting a 4096\times4096 pixels sample image with different tile shapes (1024\times1024, 512\times512, and 256\times256 pixels), using the baseline pipeline and the proposed distributed pipeline."><img src="https://thejacksonlaboratory.github.io/imaging_applications/posts/2025-02-17-distributed-micro-sam/imgs/distributed_time_comparison_bar.svg" class="img-fluid figure-img" alt="Figure 1: Elapsed time for segmenting a 4096\times4096 pixels sample image with different tile shapes (1024\times1024, 512\times512, and 256\times256 pixels), using the baseline pipeline and the proposed distributed pipeline."></a></p>
+<figcaption>Figure 1: Elapsed time for segmenting a <img src="https://latex.codecogs.com/png.latex?4096%5Ctimes4096"> pixels sample image with different <em>tile shapes</em> (<img src="https://latex.codecogs.com/png.latex?1024%5Ctimes1024">, <img src="https://latex.codecogs.com/png.latex?512%5Ctimes512">, and <img src="https://latex.codecogs.com/png.latex?256%5Ctimes256"> pixels), using the baseline pipeline and the proposed distributed pipeline.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="fig-count-comparison" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-count-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/distributed_count_comparison.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-4" title="Figure&nbsp;2: Count of segmented objects in a 4096\times4096 pixels sample image obtained with different tile shapes (1024\times1024, 512\times512, and 256\times256 pixels) using the baseline pipeline and the proposed distributed pipeline."><img src="https://thejacksonlaboratory.github.io/imaging_applications/posts/2025-02-17-distributed-micro-sam/imgs/distributed_count_comparison.svg" class="img-fluid figure-img"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-count-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Count of segmented objects in a <img src="https://latex.codecogs.com/png.latex?4096%5Ctimes4096"> pixels sample image obtained with different <em>tile shapes</em> (<img src="https://latex.codecogs.com/png.latex?1024%5Ctimes1024">, <img src="https://latex.codecogs.com/png.latex?512%5Ctimes512">, and <img src="https://latex.codecogs.com/png.latex?256%5Ctimes256"> pixels) using the baseline pipeline and the proposed distributed pipeline.
+</figcaption>
+</figure>
+</div>
+<p>According to the experimental results, the proposed distributed approach offers an average speed-up of <img src="https://latex.codecogs.com/png.latex?8.10"> times compared with the baseline approach, and an average increment of <img src="https://latex.codecogs.com/png.latex?5.3%20%5C%25"> of objects segmented. The increment on segmented objects is due to edge effects that cause objects in adjacent chunks be labeled with different indices. However, there exist tools for handling such edge effects which commonly involve adding <em>overlapping</em> pixels between chunks and <em>relabeling</em> objects in edge regions.</p>
+</section>
+<section id="experimenting-with-inputs-chunk-sizes" class="level2">
+<h2 class="anchored" data-anchor-id="experimenting-with-inputs-chunk-sizes">5.2. Experimenting with input’s <em>chunk sizes</em></h2>
+<p>The size of the chunks handled to each <em>worker</em> also has an effect on the segmentation time. To capture different cases, the sample image was re-chunked to different <em>chunk sizes</em>: <img src="https://latex.codecogs.com/png.latex?2048%5Ctimes2048">, and <img src="https://latex.codecogs.com/png.latex?1024%5Ctimes1024"> pixels per chunk. The time taken to segment the sample image and the count of segmented objects was measured for the different combinations of input’s <em>chunk sizes</em> and segmentation <em>tile shapes</em>. The results are presented in Figure&nbsp;3 and Figure&nbsp;4, respectively.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs"><li class="nav-item"><a class="nav-link active" id="tabset-9-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-1" aria-controls="tabset-9-1" aria-selected="true">Boxplot</a></li><li class="nav-item"><a class="nav-link" id="tabset-9-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-2" aria-controls="tabset-9-2" aria-selected="false">Bars</a></li></ul>
+<div class="tab-content">
+<div id="tabset-9-1" class="tab-pane active" aria-labelledby="tabset-9-1-tab">
+<div id="fig-time-chunks" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-time-chunks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/distributed_time_chunks.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-5" title="Figure&nbsp;3: Elapsed time for segmenting a 4096\times4096 pixels sample image using the proposed distributed pipeline for different combinations of input’s chunk size and tile shape."><img src="https://thejacksonlaboratory.github.io/imaging_applications/posts/2025-02-17-distributed-micro-sam/imgs/distributed_time_chunks.svg" class="img-fluid figure-img"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-time-chunks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Elapsed time for segmenting a <img src="https://latex.codecogs.com/png.latex?4096%5Ctimes4096"> pixels sample image using the proposed distributed pipeline for different combinations of input’s <em>chunk size</em> and <em>tile shape</em>.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-9-2" class="tab-pane" aria-labelledby="tabset-9-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="imgs/distributed_time_chunks_bar.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-6" title="Figure 3: Elapsed time for segmenting a 4096\times4096 pixels sample image using the proposed distributed pipeline for different combinations of input’s chunk size and tile shape."><img src="https://thejacksonlaboratory.github.io/imaging_applications/posts/2025-02-17-distributed-micro-sam/imgs/distributed_time_chunks_bar.svg" class="img-fluid figure-img" alt="Figure 3: Elapsed time for segmenting a 4096\times4096 pixels sample image using the proposed distributed pipeline for different combinations of input’s chunk size and tile shape."></a></p>
+<figcaption>Figure 3: Elapsed time for segmenting a <img src="https://latex.codecogs.com/png.latex?4096%5Ctimes4096"> pixels sample image using the proposed distributed pipeline for different combinations of input’s <em>chunk size</em> and <em>tile shape</em>.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="fig-count-chunks" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-count-chunks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/distributed_count_chunks.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-7" title="Figure&nbsp;4: Count of segmented objects in a 4096\times4096 pixels sample image using the proposed distributed pipeline for different combinations of input’s chunk size and tile shape."><img src="https://thejacksonlaboratory.github.io/imaging_applications/posts/2025-02-17-distributed-micro-sam/imgs/distributed_count_chunks.svg" class="img-fluid figure-img"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-count-chunks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Count of segmented objects in a <img src="https://latex.codecogs.com/png.latex?4096%5Ctimes4096"> pixels sample image using the proposed distributed pipeline for different combinations of input’s <em>chunk size</em> and <em>tile shape</em>.
+</figcaption>
+</figure>
+</div>
+<p>The experimental results show that overall segmentation time is minimal when the input’s <em>chunk sizes</em> matches the segmentation <em>tile shape</em>. However, the count of segmented objects is less in smaller <em>chunks</em> compared to larger <em>chunks</em>. This is again related to edge artifacts reducing the effective count of objects close to the border of each <em>chunk</em>. This problem could be solved in a similar manner as mentioned above by usng <em>overlapping</em> pixels and relabeling algorithms.</p>
+</section>
+<section id="closing-remarks" class="level2">
+<h2 class="anchored" data-anchor-id="closing-remarks">5.3. Closing remarks</h2>
+<p>This guide introduced a pipeline for scaling-up inference with deep learning methods to a WSI scale applying parallel computing. The experiments have shown a relevant improvement in terms of computation time of the proposed distributed approach with respect to the baseline’s sequential computing. While the computational experiments have been applied only on a sub-image extracted from a WSI, this approach can be similarly applied to the complete extent of a WSI.</p>
+
+
+</section>
+</section>
+
+ ]]></description>
+  <category>HPC</category>
+  <category>Tutorials</category>
+  <category>Micro-SAM</category>
+  <guid>https://thejacksonlaboratory.github.io/imaging_applications/posts/2025-02-17-distributed-micro-sam/</guid>
+  <pubDate>Mon, 17 Feb 2025 00:00:00 GMT</pubDate>
+  <media:content url="https://thejacksonlaboratory.github.io/imaging_applications/posts/2025-02-17-distributed-micro-sam/microsam_dask.png" medium="image" type="image/png" height="122" width="144"/>
+</item>
 <item>
   <title>Quarto on HPC</title>
   <dc:creator>Fernando Cervantes</dc:creator>

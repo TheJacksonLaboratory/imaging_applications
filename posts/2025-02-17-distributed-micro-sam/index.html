@@ -1,0 +1,2033 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.57">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Fernando Cervantes">
+<meta name="dcterms.date" content="2025-02-17">
+<meta name="description" content="Tutorial for executing Micro-SAM (or any deep learning) segmentation method on large-scale images using Dask distributed for parallelization">
+
+<title>Distributed segmentation for Micro-SAM with Dask – JAX RIT Imaging Applications</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../../site_libs/bootstrap/bootstrap-dark.min.css" rel="prefetch" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="dark">
+<script src="../../site_libs/quarto-contrib/glightbox/glightbox.min.js"></script>
+<link href="../../site_libs/quarto-contrib/glightbox/glightbox.min.css" rel="stylesheet">
+<link href="../../site_libs/quarto-contrib/glightbox/lightbox.css" rel="stylesheet">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">JAX RIT Imaging Applications</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">The Team</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="https://erickmartins.github.io"> 
+<span class="menu-text">Erick</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../personal_pages/fernando/fernando.html"> 
+<span class="menu-text">Fernando</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../personal_pages/kiya/kiya.html"> 
+<span class="menu-text">Kiya</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../personal_pages/peter/peter.html"> 
+<span class="menu-text">Peter</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="../../posts.html"> 
+<span class="menu-text">Blog</span></a>
+  </li>  
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="../../posts.xml"> <i class="bi bi-rss" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+  <a href="" class="quarto-color-scheme-toggle quarto-navigation-tool  px-1" onclick="window.quartoToggleColorScheme(); return false;" title="Toggle dark mode"><i class="bi"></i></a>
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Distributed segmentation for Micro-SAM with Dask</h1>
+                  <div>
+        <div class="description">
+          Tutorial for executing Micro-SAM (or any deep learning) segmentation method on large-scale images using Dask distributed for parallelization
+        </div>
+      </div>
+                          <div class="quarto-categories">
+                <div class="quarto-category">HPC</div>
+                <div class="quarto-category">Tutorials</div>
+                <div class="quarto-category">Micro-SAM</div>
+              </div>
+                  </div>
+  </div>
+    
+  <div class="quarto-title-meta-author">
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-heading">Affiliation</div>
+    
+      <div class="quarto-title-meta-contents">
+      <p class="author"><a href="https://www.github.com/fercer">Fernando Cervantes</a> <a href="https://orcid.org/0000-0003-0652-2750" class="quarto-title-author-orcid"> <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAA2ZpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wTU09Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9tbS8iIHhtbG5zOnN0UmVmPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvc1R5cGUvUmVzb3VyY2VSZWYjIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iIHhtcE1NOk9yaWdpbmFsRG9jdW1lbnRJRD0ieG1wLmRpZDo1N0NEMjA4MDI1MjA2ODExOTk0QzkzNTEzRjZEQTg1NyIgeG1wTU06RG9jdW1lbnRJRD0ieG1wLmRpZDozM0NDOEJGNEZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wTU06SW5zdGFuY2VJRD0ieG1wLmlpZDozM0NDOEJGM0ZGNTcxMUUxODdBOEVCODg2RjdCQ0QwOSIgeG1wOkNyZWF0b3JUb29sPSJBZG9iZSBQaG90b3Nob3AgQ1M1IE1hY2ludG9zaCI+IDx4bXBNTTpEZXJpdmVkRnJvbSBzdFJlZjppbnN0YW5jZUlEPSJ4bXAuaWlkOkZDN0YxMTc0MDcyMDY4MTE5NUZFRDc5MUM2MUUwNEREIiBzdFJlZjpkb2N1bWVudElEPSJ4bXAuZGlkOjU3Q0QyMDgwMjUyMDY4MTE5OTRDOTM1MTNGNkRBODU3Ii8+IDwvcmRmOkRlc2NyaXB0aW9uPiA8L3JkZjpSREY+IDwveDp4bXBtZXRhPiA8P3hwYWNrZXQgZW5kPSJyIj8+84NovQAAAR1JREFUeNpiZEADy85ZJgCpeCB2QJM6AMQLo4yOL0AWZETSqACk1gOxAQN+cAGIA4EGPQBxmJA0nwdpjjQ8xqArmczw5tMHXAaALDgP1QMxAGqzAAPxQACqh4ER6uf5MBlkm0X4EGayMfMw/Pr7Bd2gRBZogMFBrv01hisv5jLsv9nLAPIOMnjy8RDDyYctyAbFM2EJbRQw+aAWw/LzVgx7b+cwCHKqMhjJFCBLOzAR6+lXX84xnHjYyqAo5IUizkRCwIENQQckGSDGY4TVgAPEaraQr2a4/24bSuoExcJCfAEJihXkWDj3ZAKy9EJGaEo8T0QSxkjSwORsCAuDQCD+QILmD1A9kECEZgxDaEZhICIzGcIyEyOl2RkgwAAhkmC+eAm0TAAAAABJRU5ErkJggg=="></a></p>
+    </div>
+    <div class="quarto-title-meta-contents">
+          <p class="affiliation">
+              <a href="https://jax.org/">
+              The Jackson Laboratory
+              </a>
+            </p>
+        </div>
+    </div>
+
+  <div class="quarto-title-meta">
+
+        
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">February 17, 2025</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">1. Overview</a>
+  <ul class="collapse">
+  <li><a href="#segmentation-methods" id="toc-segmentation-methods" class="nav-link" data-scroll-target="#segmentation-methods">1.1. Segmentation methods</a></li>
+  <li><a href="#distributed-segmentation-approach" id="toc-distributed-segmentation-approach" class="nav-link" data-scroll-target="#distributed-segmentation-approach">1.2. Distributed segmentation approach</a></li>
+  </ul></li>
+  <li><a href="#dask-distributed-cluster" id="toc-dask-distributed-cluster" class="nav-link" data-scroll-target="#dask-distributed-cluster">2. Dask <code>distributed</code> cluster</a>
+  <ul class="collapse">
+  <li><a href="#sec-slurm-job" id="toc-sec-slurm-job" class="nav-link" data-scroll-target="#sec-slurm-job">2.1. Requesting an interactive job</a></li>
+  <li><a href="#sec-dask-cluster" id="toc-sec-dask-cluster" class="nav-link" data-scroll-target="#sec-dask-cluster">2.2. Configuring a <code>dask.distributed</code> cluster</a></li>
+  <li><a href="#sec-scheduler-start" id="toc-sec-scheduler-start" class="nav-link" data-scroll-target="#sec-scheduler-start">2.3. Starting the cluster’s <em>scheduler</em></a></li>
+  <li><a href="#sec-workers-start" id="toc-sec-workers-start" class="nav-link" data-scroll-target="#sec-workers-start">2.4. Starting the cluster’s <em>workers</em></a></li>
+  </ul></li>
+  <li><a href="#sec-dist-segmentation" id="toc-sec-dist-segmentation" class="nav-link" data-scroll-target="#sec-dist-segmentation">3. Distributed segmentation</a>
+  <ul class="collapse">
+  <li><a href="#sec-segmentation-fun" id="toc-sec-segmentation-fun" class="nav-link" data-scroll-target="#sec-segmentation-fun">3.1. Encapsulating <code>micro-sam</code> segmentation function</a></li>
+  <li><a href="#opening-an-image-with-dask" id="toc-opening-an-image-with-dask" class="nav-link" data-scroll-target="#opening-an-image-with-dask">3.2. Opening an image with <code>dask</code></a>
+  <ul class="collapse">
+  <li><a href="#convert-input-image-to-zarr-optional" id="toc-convert-input-image-to-zarr-optional" class="nav-link" data-scroll-target="#convert-input-image-to-zarr-optional">3.2.1. Convert input image to Zarr (Optional)</a></li>
+  <li><a href="#re-chunk-tiles-to-contain-all-channels" id="toc-re-chunk-tiles-to-contain-all-channels" class="nav-link" data-scroll-target="#re-chunk-tiles-to-contain-all-channels">3.2.2. Re-chunk tiles to contain all channels</a></li>
+  </ul></li>
+  <li><a href="#sec-create-map-blocks" id="toc-sec-create-map-blocks" class="nav-link" data-scroll-target="#sec-create-map-blocks">3.3. Generating a distributed process for lazy computation</a></li>
+  <li><a href="#submitting-graph-for-computation" id="toc-submitting-graph-for-computation" class="nav-link" data-scroll-target="#submitting-graph-for-computation">3.4. Submitting graph for computation</a></li>
+  <li><a href="#viewing-cluster-statistics" id="toc-viewing-cluster-statistics" class="nav-link" data-scroll-target="#viewing-cluster-statistics">3.5. Viewing cluster statistics</a></li>
+  <li><a href="#shutting-down-the-dask.distributed-cluster" id="toc-shutting-down-the-dask.distributed-cluster" class="nav-link" data-scroll-target="#shutting-down-the-dask.distributed-cluster">3.6. Shutting down the <code>dask.distributed</code> cluster</a></li>
+  </ul></li>
+  <li><a href="#examine-output-segmentation" id="toc-examine-output-segmentation" class="nav-link" data-scroll-target="#examine-output-segmentation">4. Examine output segmentation</a>
+  <ul class="collapse">
+  <li><a href="#loading-regions-from-disk-with-dask" id="toc-loading-regions-from-disk-with-dask" class="nav-link" data-scroll-target="#loading-regions-from-disk-with-dask">4.1. Loading regions from disk with <code>dask</code></a></li>
+  </ul></li>
+  <li><a href="#results" id="toc-results" class="nav-link" data-scroll-target="#results">5. Results</a>
+  <ul class="collapse">
+  <li><a href="#comparing-both-pipelines" id="toc-comparing-both-pipelines" class="nav-link" data-scroll-target="#comparing-both-pipelines">5.1. Comparing both pipelines</a></li>
+  <li><a href="#experimenting-with-inputs-chunk-sizes" id="toc-experimenting-with-inputs-chunk-sizes" class="nav-link" data-scroll-target="#experimenting-with-inputs-chunk-sizes">5.2. Experimenting with input’s <em>chunk sizes</em></a></li>
+  <li><a href="#closing-remarks" id="toc-closing-remarks" class="nav-link" data-scroll-target="#closing-remarks">5.3. Closing remarks</a></li>
+  </ul></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<section id="overview" class="level1">
+<h1>1. Overview</h1>
+<p>This guide presents an approach for scaling-up deep learning segmentation methods to be applied at Whole Slide Image (WSI) scales. Whereas this approach is more efficient on High Performance Computing (HPC) environments, the pipeline can be abstracted and executed in different computing environments, even on personal computers. Additionally, the code presented here uses <code>micro-sam</code> as segmentation method; however, this approach can be adapted to execute the inference of any other method.</p>
+<section id="segmentation-methods" class="level2">
+<h2 class="anchored" data-anchor-id="segmentation-methods">1.1. Segmentation methods</h2>
+<p>There are several methods for biological structures segmentation in images, such as <a href="https://cellpose.readthedocs.io/en/latest/index.html">Cellpose</a>, <a href="https://stardist.net/">StarDist</a>, and <a href="https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/">U-Net</a>-based methods. This tutorial will focus on <a href="https://computational-cell-analytics.github.io/micro-sam/micro_sam.html">Micro-SAM</a> which is derived from the <a href="https://segment-anything.com/">Segment Anything Model (SAM)</a> that uses a <a href="https://arxiv.org/abs/2010.11929">Vision Transformer</a> backbone and applies a set of post-processing operations to obtain a segmentation mask. While Micro-SAM already implements a <a href="https://computational-cell-analytics.github.io/micro-sam/micro_sam.html#usage-questions">tile-based pipeline</a> that applies the method to sub-regions of microscopy images, this approach has some limitations in terms of memory and computation time needed to compute a whole image since it requires all pixel data to be loaded into memory beforehand.</p>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>At the time this guide was written, the Micro-SAM’s tile-based approach was fully sequential and therefore open for parallelization with the proposed approach.</p>
+</div>
+</div>
+</section>
+<section id="distributed-segmentation-approach" class="level2">
+<h2 class="anchored" data-anchor-id="distributed-segmentation-approach">1.2. Distributed segmentation approach</h2>
+<p>To scale-up segmentation with Micro-SAM to WSI level, the distributed computation library <a href="https://distributed.dask.org/en/stable/">Dask.distributed</a> is used. The approach consists of encapsulating the segmentation code into a function that can be applied to individual tiles at a time, extracted from the same image. These tiles, also called <em>chunks</em>, are relatively small and its segmentation requires less computational resources than segmenting the whole image at once. The image <em>chunks</em> are distributed and processed with the encapsulated segmentation process by multiple <em>workers</em> in parallel.</p>
+<p>It is important to point out that each <em>worker</em> has a copy of the Micro-SAM model. The reason is that SAM-based methods register their current input image preventing its use on multiple images at the same time. On the contrary, if a single model is shared among different <em>workers</em>, multiple tiles would be registered without synchronization leading to incorrect and undefined results.</p>
+</section>
+</section>
+<section id="dask-distributed-cluster" class="level1">
+<h1>2. Dask <code>distributed</code> cluster</h1>
+<p>A <em>cluster</em> of multiple <em>workers</em> for general purpose computation can be created using the <a href="https://distributed.dask.org/en/stable/"><code>dask.distributed</code></a> library. This guide shows how to set up a cluster on a HPC that uses <code>slurm</code> to manage jobs. Setting up the <code>dask.distributed</code> cluster in other computing environments can be done by following the corresponding instructions to <a href="https://docs.dask.org/en/stable/deploying.html">deploy a <code>dask</code> cluster</a>.</p>
+<section id="sec-slurm-job" class="level2">
+<h2 class="anchored" data-anchor-id="sec-slurm-job">2.1. Requesting an interactive job</h2>
+<p>The following command allocates a job for a cluster of multiple <strong><em>workers</em></strong> and a single <strong><em>scheduler</em></strong>. This command requests the same number of <strong>GPUs</strong> as <em>workers</em> are in the cluster; however, that depends on each HPC environment and GPUs availability.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb1" data-filename="bash"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">salloc</span> <span class="at">--partition</span><span class="op">=</span>PARTITION <span class="at">--qos</span><span class="op">=</span>QOS <span class="dt">\</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--mem</span><span class="op">=</span><span class="st">'32gb per worker and 64gb for the scheduler'</span> <span class="dt">\</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--cpus-per-task</span><span class="op">=</span><span class="st">'number of workers + 2'</span> <span class="dt">\</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--gres</span><span class="op">=</span>gpu:<span class="st">'number of workers'</span> <span class="dt">\</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">--time</span><span class="op">=</span>6:00:00 srun <span class="dt">\</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">--preserve-env</span> <span class="dt">\</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">--pty</span> /bin/bash</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled" title="Example command">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-2-contents" aria-controls="callout-2" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example command
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-2" class="callout-2-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>For a cluster of <span class="math inline">\(4\)</span> <em>workers</em> and <span class="math inline">\(4\)</span> GPU devices (one per <em>worker</em>) the command would be as follows:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb2" data-filename="bash"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">salloc</span> <span class="at">--partition</span><span class="op">=</span>PARTITION <span class="at">--qos</span><span class="op">=</span>QOS <span class="dt">\</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--mem</span><span class="op">=</span>192gb <span class="dt">\</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--cpus-per-task</span><span class="op">=</span>6 <span class="dt">\</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--gres</span><span class="op">=</span>gpu:4 <span class="dt">\</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">--time</span><span class="op">=</span>6:00:00 srun <span class="dt">\</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">--preserve-env</span> <span class="dt">\</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">--pty</span> /bin/bash</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The requested CPUs are <span class="math inline">\(4+2=6\)</span> (<span class="math inline">\(4\)</span> workers and <span class="math inline">\(2\)</span> extra for other operations) and memory is <span class="math inline">\(32*4 + 64=192\)</span> GB.</p>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>PARTITION</code> and <code>QOS</code> (quality of service) names depend on the HPC environment. Make sure that such partition and quality of service enable using GPUs for accelerated computing.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Depending on your HPC environment, allocating the interactive job could involve using different commands, such as <code>sinteractive</code>.</p>
+</div>
+</div>
+</section>
+<section id="sec-dask-cluster" class="level2">
+<h2 class="anchored" data-anchor-id="sec-dask-cluster">2.2. Configuring a <code>dask.distributed</code> cluster</h2>
+<p>Once the interactive job is allocated, set some environment variables to configure the <em>cluster</em>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb3" data-filename="bash"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="va">CLUSTER_HOST</span><span class="op">=</span>XX.XX.XX.XX</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>CLUSTER_HOST</code> value can be set to the IP address of the node requested, i.e.&nbsp;<code>$(hostname -i)</code>, or simply <code>localhost</code>.</p>
+</div>
+</div>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb4" data-filename="bash"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="va">CLUSTER_PORT</span><span class="op">=</span>8786</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Any free port can be used for creating the cluster, e.g.&nbsp;<code>dask.distributed</code> uses <span class="math inline">\(8786\)</span> by default.</p>
+</div>
+</div>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb5" data-filename="bash"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="va">TEMP_DIR</span><span class="op">=</span>/temporal/directory</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>All temporal files created by the scheduler are stored in <code>TEMP_DIR</code>. This location could be <code>/tmp</code> or any other <em>scratch</em> location.</p>
+</div>
+</div>
+</section>
+<section id="sec-scheduler-start" class="level2">
+<h2 class="anchored" data-anchor-id="sec-scheduler-start">2.3. Starting the cluster’s <em>scheduler</em></h2>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Verify that the <code>distributed</code> package is installed in the working environment with the following command.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-1-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-1" role="tab" aria-controls="tabset-1-1" aria-selected="true">bash</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-1-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-1-2" role="tab" aria-controls="tabset-1-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-1-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-1-1-tab">
+<div class="sourceCode" id="cb6"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="ex">dask</span> scheduler <span class="at">--version</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="tabset-1-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-1-2-tab">
+<div class="sourceCode" id="cb7"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec /path/to/micro-sam-container.sif dask scheduler <span class="at">--version</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+<p>If this does not return the version of the <code>distributed</code> package, follow the <code>dask.distributed</code>’s <a href="https://distributed.dask.org/en/stable/install.html">installation instructions</a> before continuing with this guide.</p>
+</div>
+</div>
+<p>The <em>scheduler</em> is a process responsible for assigning tiles to available <em>workers</em> in the cluster for their segmentation. Start the cluster’s <em>scheduler</em> as follows.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-2-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-1" role="tab" aria-controls="tabset-2-1" aria-selected="true">bash</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-2-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-2-2" role="tab" aria-controls="tabset-2-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-2-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-2-1-tab">
+<div class="sourceCode" id="cb8"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="ex">dask</span> scheduler <span class="at">--host</span> <span class="va">$CLUSTER_HOST</span> <span class="at">--port</span> <span class="va">$CLUSTER_PORT</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="tabset-2-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-2-2-tab">
+<div class="sourceCode" id="cb9"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec /path/to/micro-sam-container.sif <span class="dt">\</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>    dask scheduler <span class="at">--host</span> <span class="va">$CLUSTER_HOST</span> <span class="at">--port</span> <span class="va">$CLUSTER_PORT</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <em>scheduler</em> does not require access to GPUs for distributing the pipeline’s tasks even if the <em>workers</em> do have access to them.</p>
+</div>
+</div>
+</section>
+<section id="sec-workers-start" class="level2">
+<h2 class="anchored" data-anchor-id="sec-workers-start">2.4. Starting the cluster’s <em>workers</em></h2>
+<p>A <em>worker</em> is a process responsible for computing the segmentation function on an image <em>chunk</em> by separate. Initiate the <em>workers</em> processes by executing the following command as many times as <em>workers</em> are in the cluster. Note that a specific GPU ID or <strong>UUID</strong> (<strong>U</strong>niversal <strong>U</strong>nique <strong>ID</strong>) will be assigned when starting each <em>worker</em> process.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-3-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-1" role="tab" aria-controls="tabset-3-1" aria-selected="true">bash</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-3-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-3-2" role="tab" aria-controls="tabset-3-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-3-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-3-1-tab">
+<div class="sourceCode" id="cb10"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span><span class="st">'GPU ID or UUID'</span> <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="tabset-3-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-3-2-tab">
+<div class="sourceCode" id="cb11"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="at">--env</span> CUDA_VISIBLE_DEVICES=<span class="st">'GPU ID or UUID'</span> <span class="dt">\</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Any number of <em>workers</em> can be added to the cluster this way; however, it is good practice to initiate only as many workers as CPUs requested <em>less</em> a pair reserved for the scheduler and other operations. In continuation of <a href="#sec-slurm-job" class="quarto-xref">Section&nbsp;2.1</a> example, this command would be executed <strong>four</strong> times.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Memory is distributed by default as the ratio of RAM and CPUs requested with <code>salloc</code> (<a href="#sec-slurm-job" class="quarto-xref">Section&nbsp;2.1</a>). Following the example from <a href="#sec-slurm-job" class="quarto-xref">Section&nbsp;2.1</a>, <span class="math inline">\(192\)</span> GB are distributed between <span class="math inline">\(6\)</span> CPUs, which is <span class="math inline">\(32\)</span> GB of RAM for each <em>worker</em> and the remainder <span class="math inline">\(64\)</span> GB reserved for the scheduler and other operations.</p>
+</div>
+</div>
+<p>This guide covers four scenarios to determine what GPU ID/UUID (if any) is assigned when starting each <em>worker</em>. Choose the scenario according to the specifications of the HPC environment used when executing this pipeline.</p>
+<ul>
+<li><strong>No GPU support</strong>. There are no GPUs assigned to this job and the process is carried out fully on CPU. For this case remove <code>CUDA_VISIBLE_DEVICES=</code> from the command used to start each <em>worker</em>.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled" title="Example for No GPUs">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-12-contents" aria-controls="callout-12" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example for No GPUs
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-12" class="callout-12-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>The commands used to start <strong>four</strong> <em>workers</em> would be the following.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-4-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-1" role="tab" aria-controls="tabset-4-1" aria-selected="true">bash</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-4-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-4-2" role="tab" aria-controls="tabset-4-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-4-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-4-1-tab">
+<div class="sourceCode" id="cb12"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="ex">dask</span> worker <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-5"><a href="#cb12-5" aria-hidden="true" tabindex="-1"></a><span class="ex">dask</span> worker <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb12-6"><a href="#cb12-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb12-7"><a href="#cb12-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb12-8"><a href="#cb12-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-9"><a href="#cb12-9" aria-hidden="true" tabindex="-1"></a><span class="ex">dask</span> worker <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb12-10"><a href="#cb12-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb12-13"><a href="#cb12-13" aria-hidden="true" tabindex="-1"></a><span class="ex">dask</span> worker <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb12-14"><a href="#cb12-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb12-15"><a href="#cb12-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="tabset-4-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-4-2-tab">
+<div class="sourceCode" id="cb13"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec /path/to/micro-sam-container.sif <span class="dt">\</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    dask worker <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec /path/to/micro-sam-container.sif <span class="dt">\</span></span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>    dask worker <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec /path/to/micro-sam-container.sif <span class="dt">\</span></span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a>    dask worker <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec /path/to/micro-sam-container.sif <span class="dt">\</span></span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>    dask worker <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+<p>Note that those commands are exactly the same.</p>
+</div>
+</div>
+</div>
+<ul>
+<li><strong>Single GPU device</strong>. This device is shared among all <em>workers</em> and should have enough virtual memory (VRAM) to fit all copies of the model generated by each <em>worker</em>. It is important to point out that because only one device is responsible for computing all operations, its compute latency could be affected negatively.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled" title="Example for single GPU">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-13-contents" aria-controls="callout-13" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example for single GPU
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-13" class="callout-13-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>Set the environment variable <code>CUDA_VISIBLE_DEVICES</code> to the ID of the only device available for all <em>workers</em>. The device ID can be obtained with the following command.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb14" data-filename="bash"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="va">$CUDA_VISIBLE_DEVICES</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>For example, if the only device available has ID <span class="math inline">\(0\)</span>,</p>
+<pre><code>$ echo $CUDA_VISIBLE_DEVICES
+0</code></pre>
+<p>the commands used to start <strong>four</strong> <em>workers</em> would be the following.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-5-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-1" role="tab" aria-controls="tabset-5-1" aria-selected="true">bash</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-5-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-5-2" role="tab" aria-controls="tabset-5-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-5-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-5-1-tab">
+<div class="sourceCode" id="cb16"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>0 <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>0 <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb16-7"><a href="#cb16-7" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb16-8"><a href="#cb16-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-11"><a href="#cb16-11" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>0 <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb16-12"><a href="#cb16-12" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb16-13"><a href="#cb16-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb16-14"><a href="#cb16-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb16-15"><a href="#cb16-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-16"><a href="#cb16-16" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>0 <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb16-17"><a href="#cb16-17" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb16-18"><a href="#cb16-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb16-19"><a href="#cb16-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="tabset-5-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-5-2-tab">
+<div class="sourceCode" id="cb17"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="at">--env</span> CUDA_VISIBLE_DEVICES=0 <span class="dt">\</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="at">--env</span> CUDA_VISIBLE_DEVICES=0 <span class="dt">\</span></span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="at">--env</span> CUDA_VISIBLE_DEVICES=0 <span class="dt">\</span></span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="at">--env</span> CUDA_VISIBLE_DEVICES=0 <span class="dt">\</span></span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+<p>Note that those commands are exactly the same since these are using the same GPU.</p>
+</div>
+</div>
+</div>
+<ul>
+<li><strong>Multiple physical GPU devices</strong>. These devices are assigned to different <em>workers</em>, most ideally one GPU device per <em>worker</em>. This would allow us to keep the GPUs computing latency unaffected. Additionally, devices with less virtual memory could be used since only one model will be hosted per GPU.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled" title="Example for multiple GPUs">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-14-contents" aria-controls="callout-14" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example for multiple GPUs
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-14" class="callout-14-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>Set the environment variable <code>CUDA_VISIBLE_DEVICES</code> to a different ID for each <em>worker</em>. Use the following command to get the GPU IDs.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb18" data-filename="bash"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="bu">echo</span> <span class="va">$CUDA_VISIBLE_DEVICES</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>For example, if the device IDs are <span class="math inline">\(0\)</span>, <span class="math inline">\(1\)</span>, <span class="math inline">\(2\)</span>, and <span class="math inline">\(3\)</span>,</p>
+<pre><code>$ echo $CUDA_VISIBLE_DEVICES
+0,1,2,3</code></pre>
+<p>the commands used to start <strong>four</strong> <em>workers</em> would be the following.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-6-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-1" role="tab" aria-controls="tabset-6-1" aria-selected="true">bash</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-6-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-6-2" role="tab" aria-controls="tabset-6-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-6-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-6-1-tab">
+<div class="sourceCode" id="cb20"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>0 <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>1 <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>2 <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb20-12"><a href="#cb20-12" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb20-14"><a href="#cb20-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb20-15"><a href="#cb20-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-16"><a href="#cb20-16" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>3 <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb20-17"><a href="#cb20-17" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb20-18"><a href="#cb20-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb20-19"><a href="#cb20-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="tabset-6-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-6-2-tab">
+<div class="sourceCode" id="cb21"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="at">--env</span> CUDA_VISIBLE_DEVICES=0 <span class="dt">\</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="at">--env</span> CUDA_VISIBLE_DEVICES=1 <span class="dt">\</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="at">--env</span> CUDA_VISIBLE_DEVICES=2 <span class="dt">\</span></span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="at">--env</span> CUDA_VISIBLE_DEVICES=3 <span class="dt">\</span></span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<ul>
+<li><strong>Multi-Instance GPUs (MIG)</strong>. This leverages the <a href="https://www.nvidia.com/en-us/technologies/multi-instance-gpu/">MIG</a> functionality of certain GPU devices. In this pipeline, a distinct MIG is assigned to each different <em>workers</em> as if these were physical devices.</li>
+</ul>
+<div class="callout callout-style-default callout-tip callout-titled" title="Example for MIGs">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-15-contents" aria-controls="callout-15" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example for MIGs
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-15" class="callout-15-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>Set the environment variable <code>CUDA_VISIBLE_DEVICES</code> to point to a different <em>instance</em> <strong>UUID</strong> when starting each <em>worker</em>. Instances’ UUIDs can be obtained with the following command.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>bash</strong></pre>
+</div>
+<div class="sourceCode" id="cb22" data-filename="bash"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="ex">nvidia-smi</span> <span class="at">-L</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>For example, if the MIGs’ <strong>UUID</strong>s are</p>
+<ul>
+<li><p><code>MIG-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb</code>,</p></li>
+<li><p><code>MIG-cccccccc-cccc-cccc-cccc-cccccccccccc</code>,</p></li>
+<li><p><code>MIG-dddddddd-dddd-dddd-dddd-dddddddddddd</code>, and</p></li>
+<li><p><code>MIG-eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee</code>,</p></li>
+</ul>
+<pre><code>$ nvidia-smi -L
+GPU 0: A100-SXM4-40GB (UUID: GPU-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa)
+  MIG 1g.5gb      Device  0: (UUID: MIG-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb)
+  MIG 1g.5gb      Device  1: (UUID: MIG-cccccccc-cccc-cccc-cccc-cccccccccccc)
+  MIG 1g.5gb      Device  2: (UUID: MIG-dddddddd-dddd-dddd-dddd-dddddddddddd)
+  MIG 1g.5gb      Device  3: (UUID: MIG-eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee)</code></pre>
+<p>the commands used to start <strong>four</strong> <em>workers</em> would be the following.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-7-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-1" role="tab" aria-controls="tabset-7-1" aria-selected="true">bash</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-7-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-7-2" role="tab" aria-controls="tabset-7-2" aria-selected="false">singularity/apptainer</a></li></ul>
+<div class="tab-content">
+<div id="tabset-7-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-7-1-tab">
+<div class="sourceCode" id="cb24"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>MIG-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>MIG-cccccccc-cccc-cccc-cccc-cccccccccccc <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>MIG-dddddddd-dddd-dddd-dddd-dddddddddddd <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a><span class="va">CUDA_VISIBLE_DEVICES</span><span class="op">=</span>MIG-eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee <span class="ex">dask</span> worker <span class="dt">\</span></span>
+<span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb24-18"><a href="#cb24-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb24-19"><a href="#cb24-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div id="tabset-7-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-7-2-tab">
+<div class="sourceCode" id="cb25"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="dt">\</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>    <span class="at">--env</span> CUDA_VISIBLE_DEVICES=MIG-bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb <span class="dt">\</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="dt">\</span></span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">--env</span> CUDA_VISIBLE_DEVICES=MIG-cccccccc-cccc-cccc-cccc-cccccccccccc <span class="dt">\</span></span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="dt">\</span></span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">--env</span> CUDA_VISIBLE_DEVICES=MIG-dddddddd-dddd-dddd-dddd-dddddddddddd <span class="dt">\</span></span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a><span class="ex">singularity</span> exec <span class="at">--nv</span> <span class="dt">\</span></span>
+<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">--env</span> CUDA_VISIBLE_DEVICES=MIG-eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee <span class="dt">\</span></span>
+<span id="cb25-24"><a href="#cb25-24" aria-hidden="true" tabindex="-1"></a>    /path/to/micro-sam-container.sif dask worker <span class="dt">\</span></span>
+<span id="cb25-25"><a href="#cb25-25" aria-hidden="true" tabindex="-1"></a>    <span class="va">$CLUSTER_HOST</span>:<span class="va">$CLUSTER_PORT</span> <span class="dt">\</span></span>
+<span id="cb25-26"><a href="#cb25-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">--nthreads</span> 1 <span class="dt">\</span></span>
+<span id="cb25-27"><a href="#cb25-27" aria-hidden="true" tabindex="-1"></a>    <span class="at">--local-directory</span> <span class="va">$TEMP_DIR</span> <span class="kw">&amp;</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="sec-dist-segmentation" class="level1">
+<h1>3. Distributed segmentation</h1>
+<p>The remainder of this guide is intended to be executed in Python, either in an interactive session or a <code>jupyter</code> notebook.</p>
+<section id="sec-segmentation-fun" class="level2">
+<h2 class="anchored" data-anchor-id="sec-segmentation-fun">3.1. Encapsulating <code>micro-sam</code> segmentation function</h2>
+<p>The encapsulated segmentation function comprises two operations: 1) model initialization, and 2) segmentation mask computation. For this method the time required to initialize the deep learning model is negligible compared to the segmentation process. Additionally, by keeping the model within the scope of the segmentation function it is ensured that a single model is instantiated for each <em>worker</em> preventing clashing.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb26" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> micro_sam.util <span class="im">import</span> get_device</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> micro_sam.automatic_segmentation <span class="im">import</span> get_predictor_and_segmenter, automatic_instance_segmentation</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> sam_segment_chunk(im_chunk, model_type<span class="op">=</span><span class="st">"vit_h"</span>, tile_shape<span class="op">=</span><span class="va">None</span>, halo<span class="op">=</span><span class="va">None</span>, use_gpu<span class="op">=</span><span class="va">False</span>, block_info<span class="op">=</span><span class="va">None</span>):</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>    <span class="co">"""Encapsulated segmentation function</span></span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a><span class="co">       Parameters</span></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a><span class="co">       ----------</span></span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a><span class="co">       im_chunk : array_like</span></span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a><span class="co">           Tile or chunk on which the segmentation methods is applied.</span></span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a><span class="co">       model_type : str</span></span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a><span class="co">           The type of model used for segmentation.</span></span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a><span class="co">           Visit https://computational-cell-analytics.github.io/micro-sam/micro_sam.html#finetuned-models for a full list of models.</span></span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a><span class="co">       tile_shape : tuple, optional</span></span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a><span class="co">           Shape of the tiles for tiled prediction. By default, prediction is run without tiling.</span></span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a><span class="co">       halo : tuple, optional</span></span>
+<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a><span class="co">           Overlap of the tiles for tiled prediction.</span></span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a><span class="co">       use_gpu : bool</span></span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a><span class="co">           Whether use GPU for acceleration or not.</span></span>
+<span id="cb26-20"><a href="#cb26-20" aria-hidden="true" tabindex="-1"></a><span class="co">       block_info : dict, optional</span></span>
+<span id="cb26-21"><a href="#cb26-21" aria-hidden="true" tabindex="-1"></a><span class="co">           Describes the location of the current chunk in reference to the whole array.</span></span>
+<span id="cb26-22"><a href="#cb26-22" aria-hidden="true" tabindex="-1"></a><span class="co">           This is exclusively used by the `map_blocks` function and does not require to be set by the user.</span></span>
+<span id="cb26-23"><a href="#cb26-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-24"><a href="#cb26-24" aria-hidden="true" tabindex="-1"></a><span class="co">       Returns</span></span>
+<span id="cb26-25"><a href="#cb26-25" aria-hidden="true" tabindex="-1"></a><span class="co">       -------</span></span>
+<span id="cb26-26"><a href="#cb26-26" aria-hidden="true" tabindex="-1"></a><span class="co">       segmentation_mask : array_like</span></span>
+<span id="cb26-27"><a href="#cb26-27" aria-hidden="true" tabindex="-1"></a><span class="co">           A two-dimensional segmentation mask.</span></span>
+<span id="cb26-28"><a href="#cb26-28" aria-hidden="true" tabindex="-1"></a><span class="co">    """</span></span>
+<span id="cb26-29"><a href="#cb26-29" aria-hidden="true" tabindex="-1"></a>    sam_predictor, sam_instance_segmenter <span class="op">=</span> get_predictor_and_segmenter(</span>
+<span id="cb26-30"><a href="#cb26-30" aria-hidden="true" tabindex="-1"></a>        model_type<span class="op">=</span>model_type,</span>
+<span id="cb26-31"><a href="#cb26-31" aria-hidden="true" tabindex="-1"></a>        device<span class="op">=</span>get_device(<span class="st">"cuda"</span> <span class="cf">if</span> use_gpu <span class="cf">else</span> <span class="st">"cpu"</span>),</span>
+<span id="cb26-32"><a href="#cb26-32" aria-hidden="true" tabindex="-1"></a>        amg<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb26-33"><a href="#cb26-33" aria-hidden="true" tabindex="-1"></a>        checkpoint<span class="op">=</span><span class="va">None</span>,</span>
+<span id="cb26-34"><a href="#cb26-34" aria-hidden="true" tabindex="-1"></a>        is_tiled<span class="op">=</span>tile_shape <span class="kw">is</span> <span class="kw">not</span> <span class="va">None</span>,</span>
+<span id="cb26-35"><a href="#cb26-35" aria-hidden="true" tabindex="-1"></a>        stability_score_offset<span class="op">=</span><span class="fl">1.0</span></span>
+<span id="cb26-36"><a href="#cb26-36" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb26-37"><a href="#cb26-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-38"><a href="#cb26-38" aria-hidden="true" tabindex="-1"></a>    segmentation_mask <span class="op">=</span> automatic_instance_segmentation(</span>
+<span id="cb26-39"><a href="#cb26-39" aria-hidden="true" tabindex="-1"></a>        predictor<span class="op">=</span>sam_predictor,</span>
+<span id="cb26-40"><a href="#cb26-40" aria-hidden="true" tabindex="-1"></a>        segmenter<span class="op">=</span>sam_instance_segmenter,</span>
+<span id="cb26-41"><a href="#cb26-41" aria-hidden="true" tabindex="-1"></a>        input_path<span class="op">=</span>im_chunk[<span class="dv">0</span>, :, <span class="dv">0</span>].transpose(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">0</span>),</span>
+<span id="cb26-42"><a href="#cb26-42" aria-hidden="true" tabindex="-1"></a>        ndim<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb26-43"><a href="#cb26-43" aria-hidden="true" tabindex="-1"></a>        tile_shape<span class="op">=</span>tile_shape,</span>
+<span id="cb26-44"><a href="#cb26-44" aria-hidden="true" tabindex="-1"></a>        halo<span class="op">=</span>halo,</span>
+<span id="cb26-45"><a href="#cb26-45" aria-hidden="true" tabindex="-1"></a>        verbose<span class="op">=</span><span class="va">False</span></span>
+<span id="cb26-46"><a href="#cb26-46" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb26-47"><a href="#cb26-47" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-48"><a href="#cb26-48" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Offset the segmentation indices to prevent aliasing with other chunks</span></span>
+<span id="cb26-49"><a href="#cb26-49" aria-hidden="true" tabindex="-1"></a>    chunk_idx <span class="op">=</span> np.ravel_multi_index(</span>
+<span id="cb26-50"><a href="#cb26-50" aria-hidden="true" tabindex="-1"></a>        block_info[<span class="st">'chunk-location'</span>],</span>
+<span id="cb26-51"><a href="#cb26-51" aria-hidden="true" tabindex="-1"></a>        block_info[<span class="st">'num-chunks'</span>]</span>
+<span id="cb26-52"><a href="#cb26-52" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb26-53"><a href="#cb26-53" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-54"><a href="#cb26-54" aria-hidden="true" tabindex="-1"></a>    segmentation_mask <span class="op">=</span> np.where(</span>
+<span id="cb26-55"><a href="#cb26-55" aria-hidden="true" tabindex="-1"></a>        segmentation_mask,</span>
+<span id="cb26-56"><a href="#cb26-56" aria-hidden="true" tabindex="-1"></a>        segmentation_mask <span class="op">+</span> chunk_idx <span class="op">*</span> (<span class="dv">2</span> <span class="op">**</span> <span class="dv">32</span> <span class="op">-</span> <span class="dv">1</span>),</span>
+<span id="cb26-57"><a href="#cb26-57" aria-hidden="true" tabindex="-1"></a>        <span class="dv">0</span></span>
+<span id="cb26-58"><a href="#cb26-58" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb26-59"><a href="#cb26-59" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-60"><a href="#cb26-60" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> segmentation_mask</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The input chunk <code>im_chunk</code> is expected to have axes “TCZYX” following the <a href="https://ome-model.readthedocs.io/en/stable/ome-tiff/specification.html">OME-TIFF specification</a>. This makes this pipeline compatible with images converted to the <a href="https://zarr.dev/">Zarr</a> format with <a href="https://github.com/glencoesoftware/bioformats2raw"><code>bioformats2raw</code></a> converter. When calling the <code>automatic_instance_segmentation</code> function from <code>micro-sam</code>, the input’s axes are <em>squeezed</em> and transposed to have “YXC” order as expected.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The encapsulated function uses Micro-SAM’s tile-based pipeline internally when <code>tile_shape</code> is different from <code>None</code>. That allows us to maintain the behavior close to the original while keeping the process parallelizable.</p>
+</div>
+</div>
+</section>
+<section id="opening-an-image-with-dask" class="level2">
+<h2 class="anchored" data-anchor-id="opening-an-image-with-dask">3.2. Opening an image with <code>dask</code></h2>
+<p>The input image will be loaded as a <code>dask.array</code> which allows its manipulation in a <em>lazy</em> manner. For more information about the <code>dask.array</code> module visit the official <a href="https://docs.dask.org/en/stable/array.html">documentation site</a>.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Lazy loading permits opening only the regions of the image that are being computed at a certain time. Because this process is applied in parallel to individual <em>chunks</em> of the image, instead to the whole image, the overall memory required for segmentation is reduced significatively.</p>
+</div>
+</div>
+<p>An image can be opened from disk using the <a href="https://github.com/cgohlke/tifffile/"><code>tifffile</code></a> library and be passed to <code>dask.array</code> to retrieve the pixel data lazily. The axes of the image array are ordered following the OME-TIFF specification to “TCZYX”. This order stands for <strong>T</strong>ime, <strong>C</strong>hannel, and the <strong>Z</strong>, <strong>Y</strong>, <strong>X</strong> spatial dimensions.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The <code>tifffile</code> library was historically installed by <a href="https://scikit-image.org/"><code>scikit-image</code></a> as dependency of its <code>skimage.io</code> module, and is now used as plugin by the <a href="https://imageio.readthedocs.io/en/stable/"><code>imageio</code></a> library as well.</p>
+</div>
+</div>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb27" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> tifffile</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> dask.array <span class="im">as</span> da</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>im_fp <span class="op">=</span> tifffile.imread(<span class="st">"/path/to/image/file"</span>, aszarr<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>im <span class="op">=</span> da.from_zarr(im_fp)</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>im <span class="op">=</span> im.transpose(<span class="dv">2</span>, <span class="dv">0</span>, <span class="dv">1</span>)[<span class="va">None</span>, :, <span class="va">None</span>, ...]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>By using <code>aszarr=True</code> argument, the image file is opened as it was a Zarr file allowing to load <em>chunks</em> lazily with the <code>dask.array.from_zarr</code> function.</p>
+</div>
+</div>
+<section id="convert-input-image-to-zarr-optional" class="level3">
+<h3 class="anchored" data-anchor-id="convert-input-image-to-zarr-optional">3.2.1. Convert input image to Zarr (Optional)</h3>
+<p>Alternatively, the input image file can be converted into the Zarr format using converters such as <code>bioformats2raw</code>. That way, the pixel data can be retrieved directly from the file on disk with <code>dask.array.from_zarr</code>. Moreover, if <code>bioformats2raw</code> is used to convert the image, its dimensions will be already in the expected “TCZYX” order.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb28" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> dask.array <span class="im">as</span> da</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>im <span class="op">=</span> da.from_zarr(<span class="st">"/path/to/zarr/file.zarr"</span>, component<span class="op">=</span><span class="st">"0/0"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="re-chunk-tiles-to-contain-all-channels" class="level3">
+<h3 class="anchored" data-anchor-id="re-chunk-tiles-to-contain-all-channels">3.2.2. Re-chunk tiles to contain all channels</h3>
+<p>When converting multi-channel images to the Zarr format, it is usual to channels be split into sperate chunks. However, the segmentation function defined in <a href="#sec-segmentation-fun" class="quarto-xref">Section&nbsp;3.1</a> requires all color channels to be in the same chunk. Therefore, the <code>rechunk</code> method from <code>dask.array.Array</code> objects is used to merge the image’s channels as follows.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb29" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>im <span class="op">=</span> im.rechunk({<span class="dv">1</span>: <span class="op">-</span><span class="dv">1</span>})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The axis at index <span class="math inline">\(1\)</span> corresponds to the <strong>C</strong>hannel dimension in the “TCZYX” ordering.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled" title="Example change chunk spatial size">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-22-contents" aria-controls="callout-22" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example change chunk spatial size
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-22" class="callout-22-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>The size of the chunks processed by each <em>worker</em> can be modified to match different use-cases, such as smaller or larger chunks depending the available computing resources.</p>
+<p>For example, if chunks of size <span class="math inline">\(4096\times4096\)</span> pixels would be used istead of the original’s chunk spatial size, the image would be re-chunked as follows:</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb30" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>im <span class="op">=</span> im.rechunk({<span class="dv">1</span>: <span class="op">-</span><span class="dv">1</span>, <span class="dv">3</span>: <span class="dv">4096</span>, <span class="dv">4</span>: <span class="dv">4096</span>})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The axes at indices <span class="math inline">\(3\)</span> and <span class="math inline">\(4\)</span> corresponds respectively to the <strong>Y</strong> and <strong>X</strong> spatial dimensions in the “TCZYX” ordering.</p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="sec-create-map-blocks" class="level2">
+<h2 class="anchored" data-anchor-id="sec-create-map-blocks">3.3. Generating a distributed process for lazy computation</h2>
+<p>The segmentation pipeline is submitted for computation using the <a href="https://docs.dask.org/en/stable/generated/dask.array.Array.map_blocks.html#dask.array.Array.map_blocks"><code>map_blocks</code></a> function from the <code>dask.array</code> module. This function distributes the image tiles across all <em>workers</em> for their segmentation and merges the results back into a single array.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb31" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>seg_labels <span class="op">=</span> da.map_blocks(</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>    sam_segment_chunk,</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>    im,</span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>    model_type<span class="op">=</span><span class="st">"vit_b_lm"</span>,</span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>    use_gpu<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>    tile_shape<span class="op">=</span>[<span class="dv">1024</span>, <span class="dv">1024</span>],</span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>    halo<span class="op">=</span>[<span class="dv">256</span>, <span class="dv">256</span>],</span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>    drop_axis<span class="op">=</span>(<span class="dv">0</span>, <span class="dv">1</span>, <span class="dv">2</span>),</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>    chunks<span class="op">=</span>im.chunks[<span class="op">-</span><span class="dv">2</span>:],</span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>    dtype<span class="op">=</span>np.int64,</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>    meta<span class="op">=</span>np.empty((<span class="dv">0</span>,), dtype<span class="op">=</span>np.int64)</span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The type of model used for segmentation as well as the <em>tile shape</em> and <em>halo</em> parameters can be modified according to the user needs.</p>
+</div>
+</div>
+<p>The resulting <code>seg_labels</code> array can be set to be stored into a Zarr file directly. This avoids retaining the whole segmentation array on memory unnecessarily.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb32" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>seg_labels <span class="op">=</span> seg_labels.to_zarr(</span>
+<span id="cb32-2"><a href="#cb32-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"/path/to/segmentation/output.zarr"</span>,</span>
+<span id="cb32-3"><a href="#cb32-3" aria-hidden="true" tabindex="-1"></a>    component<span class="op">=</span><span class="st">"0/0"</span>,</span>
+<span id="cb32-4"><a href="#cb32-4" aria-hidden="true" tabindex="-1"></a>    overwrite<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb32-5"><a href="#cb32-5" aria-hidden="true" tabindex="-1"></a>    compute<span class="op">=</span><span class="va">False</span></span>
+<span id="cb32-6"><a href="#cb32-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Note that the <code>seg_labels.to_zarr</code> method is called with parameter <code>compute=False</code>.</p>
+</div>
+</div>
+</section>
+<section id="submitting-graph-for-computation" class="level2">
+<h2 class="anchored" data-anchor-id="submitting-graph-for-computation">3.4. Submitting graph for computation</h2>
+<p>The operations in the previous <a href="#sec-create-map-blocks" class="quarto-xref">Section&nbsp;3.3</a> defined a graph of tasks that are waiting to be executed by a <em>scheduler</em>.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This process is called <em>scheduling</em> and its detailed description can be found at <code>dask</code>’s <a href="https://docs.dask.org/en/stable/scheduling.html">official documentation</a>.</p>
+</div>
+</div>
+<p>To use the <em>cluster</em> created in <a href="#sec-scheduler-start" class="quarto-xref">Section&nbsp;2.3</a> use the following command.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb33" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dask.distributed <span class="im">import</span> Client</span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> Client(<span class="st">'CLUSTER_HOST:CLUSTER_PORT'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>Set the <code>CLUSTER_HOST</code> and <code>CLUSTER_PORT</code> used in <a href="#sec-dask-cluster" class="quarto-xref">Section&nbsp;2.2</a> to create the cluster.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Important
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><code>Dask</code> will use a <em>single-machine scheduler</em> for executing the graph of tasks by default, so make sure the <code>client</code> is connected before computing the graph.</p>
+</div>
+</div>
+<p>In interactive notebooks (e.g.&nbsp;<code>jupyter</code>) cluster’s information can be displayed by calling the <code>client</code> as follows.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb34" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>client</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><a href="imgs/client_info.png" class="lightbox" data-gallery="quarto-lightbox-gallery-1"><img src="imgs/client_info.png" class="img-fluid"></a></p>
+<p>Finally, execute the pipeline by calling the <code>seg_labels.compute()</code> method.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb35" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>_ <span class="op">=</span> seg_labels.compute()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The pipeline’s elapsed time depends on the computing resources of the cluster and the size of the input image. It can even take a couple of hours to process a Whole Slide Image (WSI).</p>
+</div>
+</div>
+</section>
+<section id="viewing-cluster-statistics" class="level2">
+<h2 class="anchored" data-anchor-id="viewing-cluster-statistics">3.5. Viewing cluster statistics</h2>
+<p>Use the address shown by the <code>client</code> under “Dashboard” to monitor the cluster’s status while the process is running. This tool allows us to visualize the task’s progress and overall usage of the cluster’s resources.</p>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>The Dashboard can be accessed through <code>http://CLUSTER_HOST:8787/status</code>. Note that the port <span class="math inline">\(8787\)</span> is used by default; however, in case that port <span class="math inline">\(8787\)</span> is already in use a random port will be generated. The port can be specified when starting the <em>scheduler</em> with the <code>--dashboard-address</code> argument.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-note callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Note
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>This dashboard may not show the usage of the GPUs, for what the <code>nvidia-smi</code> command can be used instead.</p>
+</div>
+</div>
+</section>
+<section id="shutting-down-the-dask.distributed-cluster" class="level2">
+<h2 class="anchored" data-anchor-id="shutting-down-the-dask.distributed-cluster">3.6. Shutting down the <code>dask.distributed</code> cluster</h2>
+<p>After the whole process has finished, execute the command below to shut down the cluster. This will safely terminate the <em>scheduler</em> process and all <em>workers</em> associated with it.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb36" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>client.shutdown()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+</section>
+<section id="examine-output-segmentation" class="level1">
+<h1>4. Examine output segmentation</h1>
+<p>The output of this pipeline is stored in Zarr format and can be opened with any software supporting it. Some image analysis that have support for opening Zarr files are <a href="https://qupath.github.io/">QPath</a>, <a href="https://imagej.net/software/fiji/">Fiji/ImageJ</a>, <a href="https://napari.org/stable/">napari</a>, <a href="https://github.com/hms-dbmi/vizarr">vizarr</a>, etc.</p>
+<section id="loading-regions-from-disk-with-dask" class="level2">
+<h2 class="anchored" data-anchor-id="loading-regions-from-disk-with-dask">4.1. Loading regions from disk with <code>dask</code></h2>
+<p>A similar approach to opening the input image can be used to load the resulting segmentation output in Python or <code>jupyter</code>.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb37" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>seg_labels <span class="op">=</span> da.from_zarr(</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>    <span class="st">"/path/to/segmentation/output.zarr"</span>,</span>
+<span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>    component<span class="op">=</span><span class="st">"0/0"</span></span>
+<span id="cb37-4"><a href="#cb37-4" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Tip
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>It is recommended to examine relatively small regions of the input image and resulting segmentation instead of the whole extent of the images to prevent running out of memory.</p>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip callout-titled" title="Example of examination of a 512x512 pixels region of interest">
+<div class="callout-header d-flex align-content-center" data-bs-toggle="collapse" data-bs-target=".callout-32-contents" aria-controls="callout-32" aria-expanded="false" aria-label="Toggle callout">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Example of examination of a 512x512 pixels region of interest
+</div>
+<div class="callout-btn-toggle d-inline-block border-0 py-1 ps-1 pe-0 float-end"><i class="callout-toggle"></i></div>
+</div>
+<div id="callout-32" class="callout-32-contents callout-collapse collapse">
+<div class="callout-body-container callout-body">
+<p>In the following code a region of interest (ROI) of size <span class="math inline">\(256\times256\)</span> pixels at pixel coordinates (<span class="math inline">\(512\)</span>, <span class="math inline">\(512\)</span>) is examined.</p>
+<div class="code-with-filename">
+<div class="code-with-filename-file">
+<pre><strong>python</strong></pre>
+</div>
+<div class="sourceCode" id="cb38" data-filename="python"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>plt.imshow(im[<span class="dv">0</span>, :, <span class="dv">0</span>, <span class="dv">512</span>:<span class="dv">512</span> <span class="op">+</span> <span class="dv">256</span>, <span class="dv">512</span>:<span class="dv">512</span> <span class="op">+</span> <span class="dv">256</span>].transpose(<span class="dv">1</span>, <span class="dv">2</span>, <span class="dv">0</span>))</span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>plt.imshow(seg_labels[<span class="dv">512</span>:<span class="dv">512</span> <span class="op">+</span> <span class="dv">256</span>, <span class="dv">512</span>:<span class="dv">512</span> <span class="op">+</span> <span class="dv">256</span>], alpha<span class="op">=</span><span class="fl">0.5</span>)</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>plt.show()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The input image is assumed to be stored following the OME specification; therefore, its axes require to be transposed before calling the <code>imshow</code> function.</p>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="results" class="level1">
+<h1>5. Results</h1>
+<p>This section presents a set of experimental results of the proposed approach applied to a test image on different configurations. The test image used in these experiments can be downloaded with the <a href="https://computational-cell-analytics.github.io/micro-sam/micro_sam/sample_data.html#fetch_wholeslide_example_data">fetch_wholeslide_example_data</a> function from the <code>micro_sam.sample_data</code> module. The example image was converted using <code>bioformats2raw</code> with different chunk sizes for comparison purposes. The <code>dask.distributed</code> cluster used for these experiments consists of a scheduler and <strong>four</strong> workers. Each worker has <span class="math inline">\(32\)</span> GB of RAM and is assigned a <strong>MIG</strong> instance with <span class="math inline">\(20\)</span> GB of VRAM from a NVIDIA A100-SXM4-80GB GPU. The example image is a <span class="math inline">\(4096\times4096\)</span> pixels <em>crop</em> from a WSI.</p>
+<p>Multiple values of <em>tile shape</em> were tested to capture different use-cases. For example, small objects (e.g.&nbsp;cells) are better segmented by using relatively small tiles (<span class="math inline">\(256\times256\)</span> pixels), while groups of objects are better captured with large <em>tile shapes</em> (e.g.&nbsp;groups of cells at <span class="math inline">\(512\times512\)</span> pixels, or even tissue at <span class="math inline">\(1024\times1024\)</span> pixels).</p>
+<section id="comparing-both-pipelines" class="level2">
+<h2 class="anchored" data-anchor-id="comparing-both-pipelines">5.1. Comparing both pipelines</h2>
+<p><a href="#fig-time-comparison" class="quarto-xref">Figure&nbsp;1</a> shows the elapsed time taken to segment the sample image using the <em>baseline</em> and the proposed approaches when varying the <em>tile shape</em> parameter. In <a href="#fig-count-comparison" class="quarto-xref">Figure&nbsp;2</a>, the count of the objects segmented with the different configurations is shown.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-8-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-1" role="tab" aria-controls="tabset-8-1" aria-selected="true">Boxplot</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-8-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-8-2" role="tab" aria-controls="tabset-8-2" aria-selected="false">Bars</a></li></ul>
+<div class="tab-content">
+<div id="tabset-8-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-8-1-tab">
+<div id="fig-time-comparison" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-time-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/distributed_time_comparison.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-2" title="Figure&nbsp;1: Elapsed time for segmenting a 4096\times4096 pixels sample image with different tile shapes (1024\times1024, 512\times512, and 256\times256 pixels), using the baseline pipeline and the proposed distributed pipeline."><img src="imgs/distributed_time_comparison.svg" class="img-fluid figure-img"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-time-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;1: Elapsed time for segmenting a <span class="math inline">\(4096\times4096\)</span> pixels sample image with different <em>tile shapes</em> (<span class="math inline">\(1024\times1024\)</span>, <span class="math inline">\(512\times512\)</span>, and <span class="math inline">\(256\times256\)</span> pixels), using the baseline pipeline and the proposed distributed pipeline.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-8-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-8-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="imgs/distributed_time_comparison_bar.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-3" title="Figure 1: Elapsed time for segmenting a 4096\times4096 pixels sample image with different tile shapes (1024\times1024, 512\times512, and 256\times256 pixels), using the baseline pipeline and the proposed distributed pipeline."><img src="imgs/distributed_time_comparison_bar.svg" class="img-fluid figure-img" alt="Figure 1: Elapsed time for segmenting a 4096\times4096 pixels sample image with different tile shapes (1024\times1024, 512\times512, and 256\times256 pixels), using the baseline pipeline and the proposed distributed pipeline."></a></p>
+<figcaption>Figure 1: Elapsed time for segmenting a <span class="math inline">\(4096\times4096\)</span> pixels sample image with different <em>tile shapes</em> (<span class="math inline">\(1024\times1024\)</span>, <span class="math inline">\(512\times512\)</span>, and <span class="math inline">\(256\times256\)</span> pixels), using the baseline pipeline and the proposed distributed pipeline.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="fig-count-comparison" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-count-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/distributed_count_comparison.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-4" title="Figure&nbsp;2: Count of segmented objects in a 4096\times4096 pixels sample image obtained with different tile shapes (1024\times1024, 512\times512, and 256\times256 pixels) using the baseline pipeline and the proposed distributed pipeline."><img src="imgs/distributed_count_comparison.svg" class="img-fluid figure-img"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-count-comparison-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;2: Count of segmented objects in a <span class="math inline">\(4096\times4096\)</span> pixels sample image obtained with different <em>tile shapes</em> (<span class="math inline">\(1024\times1024\)</span>, <span class="math inline">\(512\times512\)</span>, and <span class="math inline">\(256\times256\)</span> pixels) using the baseline pipeline and the proposed distributed pipeline.
+</figcaption>
+</figure>
+</div>
+<p>According to the experimental results, the proposed distributed approach offers an average speed-up of <span class="math inline">\(8.10\)</span> times compared with the baseline approach, and an average increment of <span class="math inline">\(5.3 \%\)</span> of objects segmented. The increment on segmented objects is due to edge effects that cause objects in adjacent chunks be labeled with different indices. However, there exist tools for handling such edge effects which commonly involve adding <em>overlapping</em> pixels between chunks and <em>relabeling</em> objects in edge regions.</p>
+</section>
+<section id="experimenting-with-inputs-chunk-sizes" class="level2">
+<h2 class="anchored" data-anchor-id="experimenting-with-inputs-chunk-sizes">5.2. Experimenting with input’s <em>chunk sizes</em></h2>
+<p>The size of the chunks handled to each <em>worker</em> also has an effect on the segmentation time. To capture different cases, the sample image was re-chunked to different <em>chunk sizes</em>: <span class="math inline">\(2048\times2048\)</span>, and <span class="math inline">\(1024\times1024\)</span> pixels per chunk. The time taken to segment the sample image and the count of segmented objects was measured for the different combinations of input’s <em>chunk sizes</em> and segmentation <em>tile shapes</em>. The results are presented in <a href="#fig-time-chunks" class="quarto-xref">Figure&nbsp;3</a> and <a href="#fig-count-chunks" class="quarto-xref">Figure&nbsp;4</a>, respectively.</p>
+<div class="tabset-margin-container"></div><div class="panel-tabset">
+<ul class="nav nav-tabs" role="tablist"><li class="nav-item" role="presentation"><a class="nav-link active" id="tabset-9-1-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-1" role="tab" aria-controls="tabset-9-1" aria-selected="true">Boxplot</a></li><li class="nav-item" role="presentation"><a class="nav-link" id="tabset-9-2-tab" data-bs-toggle="tab" data-bs-target="#tabset-9-2" role="tab" aria-controls="tabset-9-2" aria-selected="false">Bars</a></li></ul>
+<div class="tab-content">
+<div id="tabset-9-1" class="tab-pane active" role="tabpanel" aria-labelledby="tabset-9-1-tab">
+<div id="fig-time-chunks" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-time-chunks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/distributed_time_chunks.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-5" title="Figure&nbsp;3: Elapsed time for segmenting a 4096\times4096 pixels sample image using the proposed distributed pipeline for different combinations of input’s chunk size and tile shape."><img src="imgs/distributed_time_chunks.svg" class="img-fluid figure-img"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-time-chunks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;3: Elapsed time for segmenting a <span class="math inline">\(4096\times4096\)</span> pixels sample image using the proposed distributed pipeline for different combinations of input’s <em>chunk size</em> and <em>tile shape</em>.
+</figcaption>
+</figure>
+</div>
+</div>
+<div id="tabset-9-2" class="tab-pane" role="tabpanel" aria-labelledby="tabset-9-2-tab">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><a href="imgs/distributed_time_chunks_bar.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-6" title="Figure 3: Elapsed time for segmenting a 4096\times4096 pixels sample image using the proposed distributed pipeline for different combinations of input’s chunk size and tile shape."><img src="imgs/distributed_time_chunks_bar.svg" class="img-fluid figure-img" alt="Figure 3: Elapsed time for segmenting a 4096\times4096 pixels sample image using the proposed distributed pipeline for different combinations of input’s chunk size and tile shape."></a></p>
+<figcaption>Figure 3: Elapsed time for segmenting a <span class="math inline">\(4096\times4096\)</span> pixels sample image using the proposed distributed pipeline for different combinations of input’s <em>chunk size</em> and <em>tile shape</em>.</figcaption>
+</figure>
+</div>
+</div>
+</div>
+</div>
+<div id="fig-count-chunks" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-count-chunks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<a href="imgs/distributed_count_chunks.svg" class="lightbox" data-gallery="quarto-lightbox-gallery-7" title="Figure&nbsp;4: Count of segmented objects in a 4096\times4096 pixels sample image using the proposed distributed pipeline for different combinations of input’s chunk size and tile shape."><img src="imgs/distributed_count_chunks.svg" class="img-fluid figure-img"></a>
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-count-chunks-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;4: Count of segmented objects in a <span class="math inline">\(4096\times4096\)</span> pixels sample image using the proposed distributed pipeline for different combinations of input’s <em>chunk size</em> and <em>tile shape</em>.
+</figcaption>
+</figure>
+</div>
+<p>The experimental results show that overall segmentation time is minimal when the input’s <em>chunk sizes</em> matches the segmentation <em>tile shape</em>. However, the count of segmented objects is less in smaller <em>chunks</em> compared to larger <em>chunks</em>. This is again related to edge artifacts reducing the effective count of objects close to the border of each <em>chunk</em>. This problem could be solved in a similar manner as mentioned above by usng <em>overlapping</em> pixels and relabeling algorithms.</p>
+</section>
+<section id="closing-remarks" class="level2">
+<h2 class="anchored" data-anchor-id="closing-remarks">5.3. Closing remarks</h2>
+<p>This guide introduced a pipeline for scaling-up inference with deep learning methods to a WSI scale applying parallel computing. The experiments have shown a relevant improvement in terms of computation time of the proposed distributed approach with respect to the baseline’s sequential computing. While the computational experiments have been applied only on a sub-image extracted from a WSI, this approach can be similarly applied to the complete extent of a WSI.</p>
+
+
+</section>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const disableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'prefetch';
+    }
+  }
+  const enableStylesheet = (stylesheets) => {
+    for (let i=0; i < stylesheets.length; i++) {
+      const stylesheet = stylesheets[i];
+      stylesheet.rel = 'stylesheet';
+    }
+  }
+  const manageTransitions = (selector, allowTransitions) => {
+    const els = window.document.querySelectorAll(selector);
+    for (let i=0; i < els.length; i++) {
+      const el = els[i];
+      if (allowTransitions) {
+        el.classList.remove('notransition');
+      } else {
+        el.classList.add('notransition');
+      }
+    }
+  }
+  const toggleGiscusIfUsed = (isAlternate, darkModeDefault) => {
+    const baseTheme = document.querySelector('#giscus-base-theme')?.value ?? 'light';
+    const alternateTheme = document.querySelector('#giscus-alt-theme')?.value ?? 'dark';
+    let newTheme = '';
+    if(darkModeDefault) {
+      newTheme = isAlternate ? baseTheme : alternateTheme;
+    } else {
+      newTheme = isAlternate ? alternateTheme : baseTheme;
+    }
+    const changeGiscusTheme = () => {
+      // From: https://github.com/giscus/giscus/issues/336
+      const sendMessage = (message) => {
+        const iframe = document.querySelector('iframe.giscus-frame');
+        if (!iframe) return;
+        iframe.contentWindow.postMessage({ giscus: message }, 'https://giscus.app');
+      }
+      sendMessage({
+        setConfig: {
+          theme: newTheme
+        }
+      });
+    }
+    const isGiscussLoaded = window.document.querySelector('iframe.giscus-frame') !== null;
+    if (isGiscussLoaded) {
+      changeGiscusTheme();
+    }
+  }
+  const toggleColorMode = (alternate) => {
+    // Switch the stylesheets
+    const alternateStylesheets = window.document.querySelectorAll('link.quarto-color-scheme.quarto-color-alternate');
+    manageTransitions('#quarto-margin-sidebar .nav-link', false);
+    if (alternate) {
+      enableStylesheet(alternateStylesheets);
+      for (const sheetNode of alternateStylesheets) {
+        if (sheetNode.id === "quarto-bootstrap") {
+          toggleBodyColorMode(sheetNode);
+        }
+      }
+    } else {
+      disableStylesheet(alternateStylesheets);
+      toggleBodyColorPrimary();
+    }
+    manageTransitions('#quarto-margin-sidebar .nav-link', true);
+    // Switch the toggles
+    const toggles = window.document.querySelectorAll('.quarto-color-scheme-toggle');
+    for (let i=0; i < toggles.length; i++) {
+      const toggle = toggles[i];
+      if (toggle) {
+        if (alternate) {
+          toggle.classList.add("alternate");     
+        } else {
+          toggle.classList.remove("alternate");
+        }
+      }
+    }
+    // Hack to workaround the fact that safari doesn't
+    // properly recolor the scrollbar when toggling (#1455)
+    if (navigator.userAgent.indexOf('Safari') > 0 && navigator.userAgent.indexOf('Chrome') == -1) {
+      manageTransitions("body", false);
+      window.scrollTo(0, 1);
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+        manageTransitions("body", true);
+      }, 40);  
+    }
+  }
+  const isFileUrl = () => { 
+    return window.location.protocol === 'file:';
+  }
+  const hasAlternateSentinel = () => {  
+    let styleSentinel = getColorSchemeSentinel();
+    if (styleSentinel !== null) {
+      return styleSentinel === "alternate";
+    } else {
+      return false;
+    }
+  }
+  const setStyleSentinel = (alternate) => {
+    const value = alternate ? "alternate" : "default";
+    if (!isFileUrl()) {
+      window.localStorage.setItem("quarto-color-scheme", value);
+    } else {
+      localAlternateSentinel = value;
+    }
+  }
+  const getColorSchemeSentinel = () => {
+    if (!isFileUrl()) {
+      const storageValue = window.localStorage.getItem("quarto-color-scheme");
+      return storageValue != null ? storageValue : localAlternateSentinel;
+    } else {
+      return localAlternateSentinel;
+    }
+  }
+  const darkModeDefault = false;
+  let localAlternateSentinel = darkModeDefault ? 'alternate' : 'default';
+  // Dark / light mode switch
+  window.quartoToggleColorScheme = () => {
+    // Read the current dark / light value 
+    let toAlternate = !hasAlternateSentinel();
+    toggleColorMode(toAlternate);
+    setStyleSentinel(toAlternate);
+    toggleGiscusIfUsed(toAlternate, darkModeDefault);
+  };
+  // Ensure there is a toggle, if there isn't float one in the top right
+  if (window.document.querySelector('.quarto-color-scheme-toggle') === null) {
+    const a = window.document.createElement('a');
+    a.classList.add('top-right');
+    a.classList.add('quarto-color-scheme-toggle');
+    a.href = "";
+    a.onclick = function() { try { window.quartoToggleColorScheme(); } catch {} return false; };
+    const i = window.document.createElement("i");
+    i.classList.add('bi');
+    a.appendChild(i);
+    window.document.body.appendChild(a);
+  }
+  // Switch to dark mode if need be
+  if (hasAlternateSentinel()) {
+    toggleColorMode(true);
+  } else {
+    toggleColorMode(false);
+  }
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp("https:\/\/thejacksonlaboratory\.github\.io\/imaging_applications");
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+<script>var lightboxQuarto = GLightbox({"loop":false,"openEffect":"zoom","closeEffect":"zoom","descPosition":"bottom","selector":".lightbox"});
+(function() {
+  let previousOnload = window.onload;
+  window.onload = () => {
+    if (previousOnload) {
+      previousOnload();
+    }
+    lightboxQuarto.on('slide_before_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      const href = trigger.getAttribute('href');
+      if (href !== null) {
+        const imgEl = window.document.querySelector(`a[href="${href}"] img`);
+        if (imgEl !== null) {
+          const srcAttr = imgEl.getAttribute("src");
+          if (srcAttr && srcAttr.startsWith("data:")) {
+            slideConfig.href = srcAttr;
+          }
+        }
+      } 
+    });
+  
+    lightboxQuarto.on('slide_after_load', (data) => {
+      const { slideIndex, slideNode, slideConfig, player, trigger } = data;
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(slideNode);
+      }
+    });
+  
+  };
+  
+})();
+          </script>
+
+
+
+
+</body></html>
