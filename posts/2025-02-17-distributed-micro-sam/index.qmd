@@ -787,7 +787,7 @@ The example image is a $4096\times4096$ pixels _crop_ from a WSI.
 Multiple values of _tile shape_ were tested to capture different use-cases.
 For example, small objects (e.g. cells) are better segmented by using relatively small tiles ($256\times256$ pixels), while groups of objects are better captured with large _tile shapes_ (e.g. groups of cells at $512\times512$ pixels, or even tissue at $1024\times1024$ pixels).
 
-## 5.1. Comparing both pipelines
+## 5.1. Comparing both pipelines {#sec-comp-pipelines}
 
 @fig-time-comparison shows the elapsed time taken to segment the sample image using the _baseline_ and the proposed approaches when varying the _tile shape_ parameter.
 In @fig-count-comparison, the count of the objects segmented with the different configurations is shown.
@@ -806,7 +806,7 @@ According to the experimental results, the proposed distributed approach offers 
 The increment on segmented objects is due to edge effects that cause objects in adjacent chunks be labeled with different indices.
 However, there exist tools for handling such edge effects which commonly involve adding *overlapping* pixels between chunks and *relabeling* objects in edge regions.
 
-## 5.2. Experimenting with input's _chunk sizes_
+## 5.2. Experimenting with input's _chunk sizes_ {#sec-comp-chunks}
 
 The size of the chunks handled to each _worker_ also has an effect on the segmentation time.
 To capture different cases, the sample image was re-chunked to different _chunk sizes_: $2048\times2048$, and $1024\times1024$ pixels per chunk.
@@ -824,9 +824,9 @@ The results are presented in @fig-time-chunks and @fig-count-chunks, respectivel
 ![Count of segmented objects in a $4096\times4096$ pixels sample image using the proposed distributed pipeline for different combinations of input's _chunk size_ and _tile shape_.](imgs/distributed_count_chunks.svg){#fig-count-chunks}
 
 The experimental results show that overall segmentation time is minimal when the input's _chunk sizes_ matches the segmentation _tile shape_.
-However, the count of segmented objects is less in smaller _chunks_ compared to larger _chunks_.
-This is again related to edge artifacts reducing the effective count of objects close to the border of each _chunk_.
-This problem could be solved in a similar manner as mentioned above by usng _overlapping_ pixels and relabeling algorithms.
+The count of segmented objects is also greater in small _chunks_ compared to larger _chunks_.
+However, this is related to single objects labeled with distinct indices by different _workers_.
+This problem can be solved in a similar manner as mentioned in @sec-comp-pipelines by using _overlapping_ pixels and relabeling algorithms.
 
 ## 5.3. Closing remarks
 
